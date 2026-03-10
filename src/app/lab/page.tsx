@@ -12,11 +12,14 @@ export default function LabPage() {
     const [progress, setProgress] = useState(0);
     const [outputUrl, setOutputUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const ffmpegRef = useRef(new FFmpeg());
+    const ffmpegRef = useRef<FFmpeg | null>(null);
 
     const load = async () => {
         try {
             const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+            if (!ffmpegRef.current) {
+                ffmpegRef.current = new FFmpeg();
+            }
             const ffmpeg = ffmpegRef.current;
 
             ffmpeg.on('log', ({ message }) => {
@@ -50,6 +53,8 @@ export default function LabPage() {
 
         try {
             const ffmpeg = ffmpegRef.current;
+            if (!ffmpeg) return;
+
             const inputName = 'input' + (file.name.substring(file.name.lastIndexOf('.')) || '.mp4');
             const outputName = 'output.mp3';
 
