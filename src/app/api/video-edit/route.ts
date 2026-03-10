@@ -215,6 +215,31 @@ export async function POST(req: Request) {
                 type: 'audio'
             });
 
+        } else if (action === 'resolve-url') {
+            if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
+
+            console.log('[video-edit] Resolving stream URL for:', url);
+            const info: any = await youtubedl(url, {
+                dumpSingleJson: true,
+                noCheckCertificates: true,
+                noWarnings: true,
+                preferFreeFormats: true,
+            });
+
+            return NextResponse.json({
+                success: true,
+                title: info.title,
+                thumbnail: info.thumbnail,
+                streamUrl: info.url,
+                formats: info.formats?.filter((f: any) => f.url).map((f: any) => ({
+                    url: f.url,
+                    ext: f.ext,
+                    note: f.format_note,
+                    acodec: f.acodec,
+                    vcodec: f.vcodec
+                }))
+            });
+
         } else {
             return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
         }
