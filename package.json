@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "@supabase/supabase-js": "^2.45.1",
     "clsx": "^2.1.1",

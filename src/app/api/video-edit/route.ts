@@ -186,11 +186,19 @@ export async function POST(req: Request) {
 
             const command = ffmpeg();
             for (const fileUrl of fileUrls) {
-                let inputPath = fileUrl;
+                let p = fileUrl;
                 if (fileUrl.startsWith('/downloads')) {
-                    inputPath = path.join(process.cwd(), 'public', fileUrl);
+                    p = path.join(process.cwd(), 'public', fileUrl);
+                } else if (!fileUrl.startsWith('http')) {
+                    // Assume it's a relative path to public
+                    p = path.join(process.cwd(), 'public', fileUrl);
                 }
-                command.input(inputPath);
+
+                if (fs.existsSync(p)) {
+                    command.input(p);
+                } else {
+                    console.error('[video-edit] File not found for merge:', p);
+                }
             }
 
             await new Promise((resolve, reject) => {
