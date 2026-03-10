@@ -147,7 +147,7 @@ export default function LabPage() {
                 // Determine if we need our proxy or if it's already tunneled on our server
                 const isTunneled = resolvedInfo.url.startsWith('/downloads');
                 const fetchUrl = isTunneled
-                    ? resolvedInfo.url
+                    ? `/api/serve-media?file=${encodeURIComponent(resolvedInfo.url)}`
                     : `/api/proxy?url=${encodeURIComponent(resolvedInfo.url)}`;
 
                 console.log('[lab-engine] Fetching source from:', isTunneled ? 'Tunnel' : 'Proxy');
