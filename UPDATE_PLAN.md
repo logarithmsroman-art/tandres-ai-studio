@@ -67,19 +67,20 @@ The platform distinguishes between "Paid Power" and "Free Utility" to ensure pro
 
 ---
 
-## 🏗️ 7. Zero-Cost Scaling Strategy
-To compete with "Big Proxy" sites and reach ₦0.00 marginal cost.
+## 🏗️ 7. Zero-Cost Scaling Strategy (In Progress 🧪)
+The "Multimedia Fusion Suite" at `/lab` is the first live implementation.
 
-### 🌐 Client-Side Processing (FFmpeg.wasm)
-*   **Logic**: Shift CPU-heavy tasks (Trimming, Cutting, Extracting) to the user's browser.
+### 🔌 Hybrid Link Engine (Implemented ✅)
+*   **Logic**: A server-side bridge fetches direct media streams from any link (TikTok, YouTube, IG).
+*   **Processing**: The user's browser (client-side) handles the actual high-performance editing via FFmpeg.wasm.
 *   **Benefit**: Platform pays $0 for CPU power. 10,000 users = 10,000 "Free" Workers.
 
-### 🧠 Global Media Cache
-*   **Logic**: Store results of popular URLs (YouTube link, etc.) in Supabase for 24 hours.
-*   **Benefit**: Instant delivery for redundant requests with zero re-processing cost.
-
-### 🔌 Proxy-Based Downloads
-*   **Logic**: Use high-speed proxy APIs for initial video fetching to bypass Railway bandwidth limits.
+### 🛠️ 8. Tool Inventory (The Lab)
+1.  **🎵 Audio Ext**: Convert any link/file to MP3.
+2.  **📽️ Video Ext**: Download full MP4 from social links.
+3.  **✂️ Cutter**: Precisely clip sections of media.
+4.  **➕ Joiner**: Merge multiple audio tracks.
+5.  **🪄 Magic Sync**: Overlay custom audio onto video.
 
 ---
 
