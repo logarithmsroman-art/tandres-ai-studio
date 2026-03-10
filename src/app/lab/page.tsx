@@ -70,9 +70,17 @@ export default function LabPage() {
 
     const resolveUrl = async () => {
         if (!pastedUrl) return;
+
+        // Validation for TikTok Slideshows
+        if (pastedUrl.includes('tiktok.com') && pastedUrl.includes('/photo/')) {
+            setError("TikTok Photo Slideshows are not supported yet. Please use a Video link.");
+            return;
+        }
+
         setIsResolving(true);
         setError(null);
         try {
+            // Special handling for vt.tiktok redirects: passed to server
             const res = await fetch('/api/video-edit', {
                 method: 'POST',
                 body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
