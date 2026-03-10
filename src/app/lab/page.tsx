@@ -144,9 +144,14 @@ export default function LabPage() {
                 fileExt = selectedFiles[0].name.substring(selectedFiles[0].name.lastIndexOf('.')) || '.mp4';
                 inputName = 'input' + fileExt;
             } else if (resolvedInfo) {
-                // Use our proxy to bypass CORS
-                const proxyUrl = `/api/proxy?url=${encodeURIComponent(resolvedInfo.url)}`;
-                inputSource = await fetchFile(proxyUrl);
+                // Determine if we need our proxy or if it's already tunneled on our server
+                const isTunneled = resolvedInfo.url.startsWith('/downloads');
+                const fetchUrl = isTunneled
+                    ? resolvedInfo.url
+                    : `/api/proxy?url=${encodeURIComponent(resolvedInfo.url)}`;
+
+                console.log('[lab-engine] Fetching source from:', isTunneled ? 'Tunnel' : 'Proxy');
+                inputSource = await fetchFile(fetchUrl);
                 inputName = 'input.mp4';
             }
 

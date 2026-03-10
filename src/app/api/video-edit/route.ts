@@ -219,6 +219,30 @@ export async function POST(req: Request) {
             if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
 
             console.log('[video-edit] Resolving stream URL for:', url);
+            const isTikTok = url.includes('tiktok.com');
+
+            // Strategy: For TikTok, we download immediately to bypass IP-locks.
+            // For others, we just get the info first.
+            if (isTikTok) {
+                console.log('[video-edit] TikTok detected - initiating Tunnel Download...');
+                const tunnelFile = path.join(downloadsDir, `tunnel-${runId}.mp4`);
+
+                await youtubedl(url, {
+                    output: tunnelFile,
+                    format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                    noCheckCertificates: true,
+                    preferFreeFormats: true,
+                });
+
+                return NextResponse.json({
+                    success: true,
+                    title: 'TikTok Content (Tunneled)',
+                    thumbnail: '', // Optional: could fetch this too
+                    streamUrl: `/downloads/tunnel-${runId}.mp4`,
+                    tunneled: true
+                });
+            }
+
             const info: any = await youtubedl(url, {
                 dumpSingleJson: true,
                 noCheckCertificates: true,
