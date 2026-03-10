@@ -136,10 +136,9 @@ export default function LabPage() {
                 fileExt = selectedFiles[0].name.substring(selectedFiles[0].name.lastIndexOf('.')) || '.mp4';
                 inputName = 'input' + fileExt;
             } else if (resolvedInfo) {
-                // If it's a URL, we might need a proxy or we fetch it via server if CORS fails, 
-                // but usually direct stream URLs from youtube-dl work better.
-                // NOTE: Fetching a large video stream in browser can be heavy.
-                inputSource = await fetchFile(resolvedInfo.url);
+                // Use our proxy to bypass CORS
+                const proxyUrl = `/api/proxy?url=${encodeURIComponent(resolvedInfo.url)}`;
+                inputSource = await fetchFile(proxyUrl);
                 inputName = 'input.mp4';
             }
 
@@ -261,8 +260,8 @@ export default function LabPage() {
                                 setPastedUrl('');
                             }}
                             className={`group p-5 rounded-3xl border transition-all relative overflow-hidden ${currentTool === tool.id
-                                    ? 'bg-zinc-900 border-purple-500 text-white shadow-2xl shadow-purple-900/20'
-                                    : 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                ? 'bg-zinc-900 border-purple-500 text-white shadow-2xl shadow-purple-900/20'
+                                : 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-900/50'
                                 }`}
                         >
                             {currentTool === tool.id && (
