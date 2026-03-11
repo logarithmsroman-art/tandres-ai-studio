@@ -6,7 +6,7 @@ OS=$(uname -s)
 ARCH=$(uname -m)
 
 if [ "$OS" = "Linux" ]; then
-    URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
+    URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
 elif [ "$OS" = "Darwin" ]; then
     URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
 else
