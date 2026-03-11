@@ -2,18 +2,78 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { create } from 'youtube-dl-exec';
 import ffmpeg from 'fluent-ffmpeg';
-
-// Set up yt-dlp binary path for Vercel/Railway/Local compatibility
-const ytdlpPath = path.join(process.cwd(), 'bin', 'yt-dlp');
-const youtubedl = create(ytdlpPath);
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 
 // Set up ffmpeg path from the installer
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 ffmpeg.setFfprobePath(ffprobeInstaller.path);
+
+// --- STEALTH MIRROR RESOLVER CONFIG ---
+const MIRRORS = [
+    'https://api.cobalt.tools/api/json',
+    'https://api.v2.cobalt.tools/api/json',
+    'https://cobalt-api.l-m.workers.dev/api/json',
+    'https://co.wuk.sh/api/json'
+];
+
+async function mirroredResolve(url: string, isAudioOnly = false) {
+    let lastError = null;
+
+    for (const mirror of MIRRORS) {
+        try {
+            console.log(`[stealth-mirror] Trying mirror: ${mirror}`);
+            const response = await fetch(mirror, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+                },
+                body: JSON.stringify({
+                    url: url,
+                    videoQuality: '1080',
+                    audioFormat: isAudioOnly ? 'mp3' : 'best',
+                    downloadMode: isAudioOnly ? 'audio' : 'video',
+                    filenameStyle: 'nerdy',
+                    isAudioOnly: isAudioOnly
+                }),
+                signal: AbortSignal.timeout(10000) // 10s timeout per mirror
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.text || `Mirror returned ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Success! Map the mirror response to our studio's internal format
+            if (data.status === 'stream' || data.status === 'picker' || data.url) {
+                return {
+                    success: true,
+                    title: data.text || 'Extracted Resource',
+                    thumbnail: '', // Optional: some mirrors provide this
+                    streamUrl: data.url || (data.picker && data.picker[0]?.url),
+                    formats: data.picker?.map((p: any) => ({
+                        url: p.url,
+                        ext: p.ext || 'mp4',
+                        note: p.quality || 'Auto'
+                    })) || []
+                };
+            }
+
+            throw new Error('No stream found in mirror response');
+        } catch (err: any) {
+            console.warn(`[stealth-mirror] Mirror ${mirror} failed:`, err.message);
+            lastError = err;
+            continue; // Try next mirror
+        }
+    }
+
+    throw lastError || new Error('All stealth mirrors are currently saturated. Please try again in 5 minutes.');
+}
 
 export async function POST(req: Request) {
     try {
@@ -73,16 +133,15 @@ export async function POST(req: Request) {
             fs.writeFileSync(inputPath, buffer);
             console.log('[video-edit] File uploaded and saved to:', inputPath);
         } else if (url && (url.startsWith('http') || url.startsWith('https'))) {
-            // We use the URL later for youtube-dl or assume it's a relative path
             if (!url.startsWith('http')) {
                 inputPath = path.join(process.cwd(), 'public', url);
             } else {
-                inputPath = url; // Pass to youtube-dl
+                inputPath = url; // Pass to resolve or processing
             }
         }
 
         // --- SUBSCRIPTION & TIKTOK VALIDATION ---
-        if (url && (action === 'download-video' || action === 'extract-audio' || action === 'magic-extract' || action === 'resolve-url')) {
+        if (url && (action === 'extract-audio' || action === 'resolve-url')) {
             let tier = 'free';
             let userProfile: any = null;
             let isTikTok = url.includes('tiktok.com');
@@ -93,34 +152,6 @@ export async function POST(req: Request) {
                 const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
                 userProfile = data;
                 if (userProfile?.subscription_tier) tier = userProfile.subscription_tier;
-            }
-
-            let maxDuration = tier === 'pro' ? 54000 : (tier === 'starter' ? 3600 : 900); // 15h, 1h, 15m
-            if (isTikTok) {
-                maxDuration = tier === 'pro' ? 600 : (tier === 'starter' ? 300 : 90); // 10m, 5m, 1.5m
-
-                if (tier !== 'free') {
-                    if (!userProfile || userProfile.tiktok_extractions_remaining <= 0) {
-                        return NextResponse.json({ error: 'No TikTok extractions remaining in your active plan.' }, { status: 403 });
-                    }
-                }
-            }
-
-            // Attempt to pre-fetch duration to validate against limits
-            try {
-                const info: any = await youtubedl(url, {
-                    dumpSingleJson: true,
-                    noCheckCertificates: true,
-                    noWarnings: true,
-                    preferFreeFormats: true,
-                });
-
-                const videoDuration = info?.duration || 0;
-                if (videoDuration > maxDuration) {
-                    return NextResponse.json({ error: `Video (${Math.floor(videoDuration / 60)}m) exceeds your plan's maximum duration limit of ${maxDuration / 60}m.` }, { status: 403 });
-                }
-            } catch (e: any) {
-                console.log('[video-edit] Pre-fetch duration check bypassed or failed:', e.message);
             }
 
             // Deduct TikTok count ONLY if this is the actual extraction action, not just a resolve
@@ -135,27 +166,7 @@ export async function POST(req: Request) {
         }
         // --- END VALIDATION ---
 
-        if (action === 'download-video') {
-            if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
-
-            console.log('[video-edit] Starting download:', url);
-            const outFile = path.join(downloadsDir, `video-${runId}.mp4`);
-
-            await youtubedl(url, {
-                output: outFile,
-                format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-                noCheckCertificates: true,
-                preferFreeFormats: true,
-            });
-
-            console.log('[video-edit] Download finished:', outFile);
-            return NextResponse.json({
-                success: true,
-                url: `/downloads/video-${runId}.mp4`,
-                type: 'video'
-            });
-
-        } else if (action === 'extract-audio') {
+        if (action === 'extract-audio') {
             if (!inputPath) return NextResponse.json({ error: 'Input file or URL required' }, { status: 400 });
 
             console.log('[video-edit] Extracting audio from:', inputPath);
@@ -179,7 +190,6 @@ export async function POST(req: Request) {
             });
 
         } else if (action === 'trim-audio') {
-            // Handle both URL and File through inputPath
             if (!inputPath) return NextResponse.json({ error: 'Input required' }, { status: 400 });
 
             console.log('[video-edit] Trimming audio:', inputPath, 'start:', startTime, 'duration:', duration);
@@ -203,37 +213,6 @@ export async function POST(req: Request) {
                 type: 'audio'
             });
 
-        } else if (action === 'magic-extract') {
-            if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
-
-            console.log('[video-edit] Starting magic extract for:', url);
-            const videoOutFile = path.join(downloadsDir, `video-${runId}.mp4`);
-            const audioOutFile = path.join(downloadsDir, `audio-${runId}.mp3`);
-
-            await youtubedl(url, {
-                output: videoOutFile,
-                format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-                noCheckCertificates: true,
-                preferFreeFormats: true,
-            });
-
-            await new Promise((resolve, reject) => {
-                ffmpeg(videoOutFile)
-                    .output(audioOutFile)
-                    .noVideo()
-                    .audioCodec('libmp3lame')
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .run();
-            });
-
-            console.log('[video-edit] Magic extract finished');
-            return NextResponse.json({
-                success: true,
-                videoUrl: `/downloads/video-${runId}.mp4`,
-                audioUrl: `/downloads/audio-${runId}.mp3`
-            });
-
         } else if (action === 'merge-audio') {
             if (!fileUrls || !Array.isArray(fileUrls) || fileUrls.length === 0) {
                 return NextResponse.json({ error: 'fileUrls array is required' }, { status: 400 });
@@ -248,7 +227,6 @@ export async function POST(req: Request) {
                 if (fileUrl.startsWith('/downloads')) {
                     p = path.join(process.cwd(), 'public', fileUrl);
                 } else if (!fileUrl.startsWith('http')) {
-                    // Assume it's a relative path to public
                     p = path.join(process.cwd(), 'public', fileUrl);
                 }
 
@@ -276,79 +254,10 @@ export async function POST(req: Request) {
         } else if (action === 'resolve-url') {
             if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
 
-            console.log('[video-edit] Resolving stream URL for:', url);
-            const isTikTok = url.includes('tiktok.com');
-            const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+            console.log('[video-edit] Engaging Stealth Mirror for:', url);
+            const data = await mirroredResolve(url);
+            return NextResponse.json(data);
 
-            // Strategy: For TikTok, we download immediately to bypass IP-locks.
-            // For others, we try to get info with Stealth Headers.
-            if (isTikTok) {
-                console.log('[video-edit] TikTok detected - initiating Tunnel Download...');
-                const tunnelFile = path.join(downloadsDir, `tunnel-${runId}.mp4`);
-
-                await youtubedl(url, {
-                    output: tunnelFile,
-                    format: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-                    noCheckCertificates: true,
-                    preferFreeFormats: true,
-                });
-
-                return NextResponse.json({
-                    success: true,
-                    title: 'TikTok Content (Tunneled)',
-                    thumbnail: '',
-                    streamUrl: `/downloads/tunnel-${runId}.mp4`,
-                    tunneled: true
-                });
-            }
-
-            // STEALTH RESOLVE FOR YOUTUBE/INSTAGRAM
-            try {
-                const stealthOptions: any = {
-                    dumpSingleJson: true,
-                    noCheckCertificates: true,
-                    noWarnings: true,
-                    preferFreeFormats: true,
-                    addHeader: [
-                        'referer:https://www.google.com/',
-                        'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-                    ]
-                };
-
-                // If YouTube, use additional stealth to bypass "Sign in" error
-                if (isYouTube) {
-                    stealthOptions.format = 'best'; // Simplify format selection for faster metadata fetch
-                    stealthOptions.geoBypass = true;
-                }
-
-                const info: any = await youtubedl(url, stealthOptions);
-
-                // Prioritize finding a single stream URL for browser fetch
-                const streamUrl = info.url || (info.formats && info.formats.reverse().find((f: any) => f.url && f.ext === 'mp4')?.url);
-
-                return NextResponse.json({
-                    success: true,
-                    title: info.title,
-                    thumbnail: info.thumbnail,
-                    streamUrl: streamUrl,
-                    formats: info.formats?.filter((f: any) => f.url).map((f: any) => ({
-                        url: f.url,
-                        ext: f.ext,
-                        note: f.format_note,
-                        acodec: f.acodec,
-                        vcodec: f.vcodec
-                    }))
-                });
-            } catch (err: any) {
-                console.error('[video-edit] Stealth resolve failed:', err.message);
-
-                // FINAL FALLBACK: If it's YouTube and standard resolve failed, try to construct a basic info object
-                // to at least attempt a proxy fetch in the browser if possible.
-                if (isYouTube && err.message.includes('Sign in')) {
-                    throw new Error("YouTube has increased security on this specific video. Try a different link or wait 10 minutes for the 'Cool Down' period.");
-                }
-                throw err;
-            }
         } else {
             return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
         }
