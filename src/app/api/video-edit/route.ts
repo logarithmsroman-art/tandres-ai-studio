@@ -256,19 +256,28 @@ export async function POST(req: Request) {
 
             const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
             const isInstagram = url.includes('instagram.com');
-            const isMirrorable = isYouTube || isInstagram;
             const isLocal = process.env.NODE_ENV === 'development';
+            // Production: Route YouTube & Instagram through Railway first (reliable yt-dlp)
+            const railwayUrl = process.env.RAILWAY_URL || '';
+            if ((isYouTube || isInstagram) && !isLocal && railwayUrl) {
+                console.log(`[video-edit] ${isYouTube ? 'YouTube' : 'Instagram'} (PROD) \u2192 Railway /api/stream`);
+                return NextResponse.json({
+                    success: true,
+                    title: isYouTube ? 'YouTube Video' : 'Instagram Video',
+                    thumbnail: '',
+                    streamUrl: `${railwayUrl}/api/stream?url=${encodeURIComponent(url)}`,
+                });
+            }
 
-            // IF (YT or IG) + PRODUCTION (Vercel/Railway), use Stealth Mirrors to bypass IP blocks
-            // IF TIKTOK OR LOCAL DEV, use our stable internal extractor
-            if (isMirrorable && !isLocal) {
-                console.log(`[video-edit] ${isYouTube ? 'YouTube' : 'Instagram'} (PROD) detected. Engaging Stealth Mirrors for:`, url);
+            // Fallback: Cobalt mirrors for YouTube (if no Railway URL)
+            if (isYouTube && !isLocal) {
+                console.log('[video-edit] YouTube (PROD, no Railway) \u2014 Cobalt mirrors for:', url);
                 try {
                     const data = await mirroredResolve(url);
                     return NextResponse.json(data);
                 } catch (e: any) {
                     console.error('[video-edit] YouTube Mirror Error:', e.message);
-                    return NextResponse.json({ error: 'YouTube extraction is temporarily saturated. Please try Instagram or TikTok for now.' }, { status: 503 });
+                    return NextResponse.json({ error: 'YouTube extraction is temporarily unavailable. Please try again in a moment.' }, { status: 503 });
                 }
             } else {
                 const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
