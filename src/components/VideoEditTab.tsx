@@ -129,24 +129,98 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
 
         setIsResolving(true);
         setError(null);
+        setResolvedInfo(null);
+
+        const isTikTok = pastedUrl.includes('tiktok.com');
+        const isAudioOnly = currentTool === 'audio-extractor' || currentTool === 'trimmer';
+
         try {
-            const res = await fetch('/api/video-edit', {
-                method: 'POST',
-                body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
-            });
-            const data = await res.json();
-            if (data.success) {
-                setResolvedInfo({
-                    title: data.title,
-                    thumbnail: data.thumbnail,
-                    url: data.streamUrl,
-                    formats: data.formats
+            // STRATEGY: 
+            // 1. If it's TikTok, ALWAYS use server-side tunnel (bypasses browser security)
+            // 2. If it's YouTube/IG, try CLIENT-SIDE MIRRORS first (Zero Cost, User IP)
+
+            if (isTikTok) {
+                const res = await fetch('/api/video-edit', {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
                 });
+                const data = await res.json();
+                if (data.success) {
+                    setResolvedInfo({
+                        title: data.title,
+                        thumbnail: data.thumbnail,
+                        url: data.streamUrl,
+                        formats: data.formats
+                    });
+                } else {
+                    throw new Error(data.error || 'Failed to resolve TikTok link');
+                }
             } else {
-                throw new Error(data.error || 'Failed to resolve link');
+                // CLIENT-SIDE MIRROR RESOLUTION (Zero Cost)
+                const mirrored_endpoints = [
+                    'https://api.cobalt.tools/api/json',
+                    'https://api.v2.cobalt.tools/api/json',
+                    'https://cobalt-api.l-m.workers.dev/api/json',
+                    'https://co.wuk.sh/api/json'
+                ];
+
+                let successfulData = null;
+                for (const mirror of mirrored_endpoints) {
+                    try {
+                        const mRes = await fetch(mirror, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                url: pastedUrl,
+                                videoQuality: '1080',
+                                audioFormat: isAudioOnly ? 'mp3' : 'best',
+                                downloadMode: isAudioOnly ? 'audio' : 'video',
+                                isAudioOnly: isAudioOnly
+                            }),
+                            signal: AbortSignal.timeout(8000)
+                        });
+
+                        if (mRes.ok) {
+                            successfulData = await mRes.json();
+                            break;
+                        }
+                    } catch (e) {
+                        continue; // try next mirror
+                    }
+                }
+
+                if (successfulData && (successfulData.url || successfulData.picker)) {
+                    setResolvedInfo({
+                        title: successfulData.text || 'Extracted Video',
+                        thumbnail: '',
+                        url: successfulData.url || (successfulData.picker && successfulData.picker[0]?.url),
+                        formats: successfulData.picker
+                    });
+                } else {
+                    // FINAL FALLBACK TO OUR OWN SERVER (if mirrors are down)
+                    const res = await fetch('/api/video-edit', {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        setResolvedInfo({
+                            title: data.title,
+                            thumbnail: data.thumbnail,
+                            url: data.streamUrl,
+                            formats: data.formats
+                        });
+                    } else {
+                        throw new Error(data.error || 'All extraction mirrors are busy. Try again in 2 minutes.');
+                    }
+                }
             }
         } catch (err: any) {
-            setError(err.message);
+            console.error('Resolution error:', err);
+            setError(err.message || "Failed to link. Please try a different link or check if it's private.");
         } finally {
             setIsResolving(false);
         }
