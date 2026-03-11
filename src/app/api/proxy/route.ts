@@ -11,21 +11,25 @@ export async function GET(req: Request) {
     try {
         console.log('[proxy-api] Proxying:', targetUrl);
 
-        // Forward headers like 'Range' which FFmpeg.wasm often uses
+        // Forward critical headers - Standardized for TikTok 403 Bypass
         const forwardHeaders: any = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': '*/*',
             'Referer': 'https://www.tiktok.com/',
+            'Origin': 'https://www.tiktok.com',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
         };
 
+        // CRITICAL: TikTok often requires a Range header to initiate a stream
         const range = req.headers.get('range');
-        if (range) {
-            forwardHeaders['Range'] = range;
-        }
+        forwardHeaders['Range'] = range || 'bytes=0-';
 
         const response = await fetch(targetUrl, {
             headers: forwardHeaders,
-            cache: 'no-store'
+            cache: 'no-store',
+            redirect: 'follow'
         });
 
         if (!response.ok && response.status !== 206) {

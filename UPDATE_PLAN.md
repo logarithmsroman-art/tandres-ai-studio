@@ -40,6 +40,7 @@ This document outlines the final business logic for Subscription Plans, the Lab 
 *   **No Cooldowns**: No cooldown between generations unless it starts causing server or application issues. If server load becomes a problem, we may add a small cooldown (e.g., 30s between runs or 5-min cooldown after 20 consecutive runs), but **only** if necessary.
 *   **Simple Rule**: You finish your credits → you purchase more. No restrictions.
 
+
 > **Note on other Voice Clone Packs (Start Pack, Creator Pack, Studio Pack):** These remain unchanged. Only the old "Monthly Pro" has been replaced by this new "Elite Pulse Credits" flat purchase system.
 
 ---

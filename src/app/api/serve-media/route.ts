@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
@@ -10,9 +11,18 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Filename required' }, { status: 400 });
     }
 
-    // Safety check: ensure we only serve from the downloads directory
-    const downloadsDir = path.join(process.cwd(), 'public', 'downloads');
-    const filePath = path.join(downloadsDir, fileName.replace('/downloads/', ''));
+    let filePath: string;
+
+    // Allow serving from OS temp dir (for TikTok direct downloads)
+    const tmpDir = os.tmpdir();
+    if (fileName.startsWith(tmpDir) || fileName.startsWith('/tmp')) {
+        // Security: only allow absolute paths starting with the system's temp dir
+        filePath = fileName;
+    } else {
+        // Safety check: ensure we only serve from the downloads directory
+        const downloadsDir = path.join(process.cwd(), 'public', 'downloads');
+        filePath = path.join(downloadsDir, fileName.replace('/downloads/', ''));
+    }
 
     if (!fs.existsSync(filePath)) {
         console.error('[serve-media] File not found:', filePath);

@@ -131,37 +131,23 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
         setError(null);
         setResolvedInfo(null);
 
-        const isTikTok = pastedUrl.includes('tiktok.com');
+        const isYouTube = pastedUrl.includes('youtube.com') || pastedUrl.includes('youtu.be');
+        const isInstagram = pastedUrl.includes('instagram.com');
         const isAudioOnly = currentTool === 'audio-extractor' || currentTool === 'trimmer';
+        const isLocal = window.location.hostname === 'localhost';
 
         try {
             // STRATEGY: 
-            // 1. If it's TikTok, ALWAYS use server-side tunnel (bypasses browser security)
-            // 2. If it's YouTube/IG, try CLIENT-SIDE MIRRORS first (Zero Cost, User IP)
+            // 1. IF (YT or IG) + PROD: Try Client-side mirrors (Zero Cost / Bypass)
+            // 2. IF LOCAL DEV OR TIKTOK: Use our stable server-side API (Direct/Tunneled)
 
-            if (isTikTok) {
-                const res = await fetch('/api/video-edit', {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    setResolvedInfo({
-                        title: data.title,
-                        thumbnail: data.thumbnail,
-                        url: data.streamUrl,
-                        formats: data.formats
-                    });
-                } else {
-                    throw new Error(data.error || 'Failed to resolve TikTok link');
-                }
-            } else {
-                // CLIENT-SIDE MIRROR RESOLUTION (Zero Cost)
+            if ((isYouTube || isInstagram) && !isLocal) {
+                // CLIENT-SIDE MIRROR RESOLUTION for YT/IG PROD (Zero Cost)
                 const mirrored_endpoints = [
                     'https://api.cobalt.tools',
                     'https://cobalt.meowing.de',
                     'https://cobalt.canine.tools',
-                    'https://api.v2.cobalt.tools'
+                    'https://cobalt.directory'
                 ];
 
                 let successfulData = null;
@@ -176,9 +162,8 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                             body: JSON.stringify({
                                 url: pastedUrl,
                                 videoQuality: '1080',
-                                audioFormat: isAudioOnly ? 'mp3' : 'best',
-                                downloadMode: isAudioOnly ? 'audio' : 'video',
-                                isAudioOnly: isAudioOnly,
+                                audioFormat: 'best',
+                                downloadMode: isAudioOnly ? 'audio' : 'auto',
                                 filenameStyle: 'nerdy'
                             }),
                             signal: AbortSignal.timeout(8000)
@@ -202,7 +187,7 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                         formats: successfulData.picker
                     });
                 } else {
-                    // FINAL FALLBACK TO OUR OWN SERVER (if mirrors are down)
+                    // Fallback to our own server if mirrors are down
                     const res = await fetch('/api/video-edit', {
                         method: 'POST',
                         body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
@@ -216,8 +201,25 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                             formats: data.formats
                         });
                     } else {
-                        throw new Error(data.error || 'All extraction mirrors are busy. Try again in 2 minutes.');
+                        throw new Error(data.error || 'YouTube extraction is currently unavailable.');
                     }
+                }
+            } else {
+                // USE STABLE SERVER EXTRACTION FOR TIKTOK / INSTAGRAM
+                const res = await fetch('/api/video-edit', {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setResolvedInfo({
+                        title: data.title,
+                        thumbnail: data.thumbnail,
+                        url: data.streamUrl,
+                        formats: data.formats
+                    });
+                } else {
+                    throw new Error(data.error || 'Failed to resolve link.');
                 }
             }
         } catch (err: any) {
@@ -438,11 +440,33 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                     fileExt = selectedFiles[0].name.substring(selectedFiles[0].name.lastIndexOf('.')) || '.mp4';
                     inputName = 'input' + fileExt;
                 } else if (resolvedInfo) {
-                    const isTunneled = resolvedInfo.url.startsWith('/downloads');
-                    const fetchUrl = isTunneled
-                        ? `/api/serve-media?file=${encodeURIComponent(resolvedInfo.url)}`
-                        : `/api/proxy?url=${encodeURIComponent(resolvedInfo.url)}`;
-                    inputSource = await fetchFile(fetchUrl);
+                    const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
+                    const urlStr = resolvedInfo.url;
+                    const isTikTok = urlStr.includes('tiktok.com') || urlStr.includes('byteoversea.com');
+                    const isInternal = urlStr.startsWith('/downloads');
+                    const isTunneled = urlStr.includes('/api/tunnel');
+                    const isFullyQualified = urlStr.startsWith('http');
+                    const alreadyWrapped = workerUrl && urlStr.startsWith(workerUrl);
+
+                    let fetchUrl = '';
+                    if (urlStr.startsWith('/api/')) {
+                        // Already a server-side route (serve-media, tunnel, proxy etc)
+                        fetchUrl = urlStr;
+                    } else if (urlStr.startsWith('/downloads')) {
+                        fetchUrl = `/api/serve-media?file=${encodeURIComponent(urlStr)}`;
+                    } else if (urlStr.startsWith('http')) {
+                        // External link - use proxy to handle CORS
+                        fetchUrl = `/api/proxy?url=${encodeURIComponent(urlStr)}`;
+                    } else {
+                        fetchUrl = `/api/proxy?url=${encodeURIComponent(urlStr)}`;
+                    }
+
+                    const fRes = await fetch(fetchUrl);
+                    if (!fRes.ok) {
+                        const errData = await fRes.json().catch(() => ({}));
+                        throw new Error(errData.error || `Source fetch failed: ${fRes.status}`);
+                    }
+                    inputSource = await fetchFile(await fRes.blob());
                     inputName = 'input.mp4';
                 }
                 await ffmpeg.writeFile(inputName, inputSource);

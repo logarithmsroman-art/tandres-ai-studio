@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
+import youtubedl from 'youtube-dl-exec';
 
 // Set up ffmpeg path from the installer
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
@@ -15,7 +16,7 @@ const MIRRORS = [
     'https://api.cobalt.tools',
     'https://cobalt.meowing.de',
     'https://cobalt.canine.tools',
-    'https://api.v2.cobalt.tools'
+    'https://cobalt.directory'
 ];
 
 async function mirroredResolve(url: string, isAudioOnly = false) {
@@ -34,10 +35,9 @@ async function mirroredResolve(url: string, isAudioOnly = false) {
                 body: JSON.stringify({
                     url: url,
                     videoQuality: '1080',
-                    audioFormat: isAudioOnly ? 'mp3' : 'best',
-                    downloadMode: isAudioOnly ? 'audio' : 'video',
-                    filenameStyle: 'nerdy',
-                    isAudioOnly: isAudioOnly
+                    audioFormat: 'best',
+                    downloadMode: isAudioOnly ? 'audio' : 'auto',
+                    filenameStyle: 'nerdy'
                 }),
                 signal: AbortSignal.timeout(10000) // 10s timeout per mirror
             });
@@ -254,9 +254,95 @@ export async function POST(req: Request) {
         } else if (action === 'resolve-url') {
             if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
 
-            console.log('[video-edit] Engaging Stealth Mirror for:', url);
-            const data = await mirroredResolve(url);
-            return NextResponse.json(data);
+            const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+            const isInstagram = url.includes('instagram.com');
+            const isMirrorable = isYouTube || isInstagram;
+            const isLocal = process.env.NODE_ENV === 'development';
+
+            // IF (YT or IG) + PRODUCTION (Vercel/Railway), use Stealth Mirrors to bypass IP blocks
+            // IF TIKTOK OR LOCAL DEV, use our stable internal extractor
+            if (isMirrorable && !isLocal) {
+                console.log(`[video-edit] ${isYouTube ? 'YouTube' : 'Instagram'} (PROD) detected. Engaging Stealth Mirrors for:`, url);
+                try {
+                    const data = await mirroredResolve(url);
+                    return NextResponse.json(data);
+                } catch (e: any) {
+                    console.error('[video-edit] YouTube Mirror Error:', e.message);
+                    return NextResponse.json({ error: 'YouTube extraction is temporarily saturated. Please try Instagram or TikTok for now.' }, { status: 503 });
+                }
+            } else {
+                const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
+
+                if (isTikTok) {
+                    const railwayUrl = process.env.RAILWAY_URL || '';
+
+                    if (railwayUrl) {
+                        // PRODUCTION: Delegate to Railway server (no timeout limits)
+                        console.log('[video-edit] TikTok → Railway /api/stream:', railwayUrl);
+                        return NextResponse.json({
+                            success: true,
+                            title: 'TikTok Video',
+                            thumbnail: '',
+                            streamUrl: `${railwayUrl}/api/stream?url=${encodeURIComponent(url)}`,
+                        });
+                    }
+
+                    // LOCAL DEV fallback: download directly to temp file
+                    const { mkdtemp } = await import('fs/promises');
+                    const path = await import('path');
+                    const os = await import('os');
+
+                    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'tiktok-'));
+                    const outputPath = path.join(tmpDir, 'video.mp4');
+
+                    console.log('[video-edit] TikTok (local dev) — downloading directly via yt-dlp...');
+                    await youtubedl(url, {
+                        noWarnings: true,
+                        format: 'best[ext=mp4]/best',
+                        output: outputPath,
+                        addHeader: [
+                            'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                            'Referer:https://www.tiktok.com/',
+                        ],
+                    });
+                    console.log('[video-edit] TikTok download complete:', outputPath);
+
+                    return NextResponse.json({
+                        success: true,
+                        title: 'TikTok Video',
+                        thumbnail: '',
+                        streamUrl: `/api/serve-media?file=${encodeURIComponent(outputPath)}`,
+                        isDownloaded: true,
+                    });
+                }
+
+                // For Instagram / other direct links
+                const info: any = await youtubedl(url, {
+                    dumpSingleJson: true,
+                    noWarnings: true,
+                    preferFreeFormats: true,
+                    addHeader: [
+                        'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                        'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                        'Accept-Language:en-US,en;q=0.9',
+                        'Referer:https://www.instagram.com/'
+                    ]
+                });
+
+                return NextResponse.json({
+                    success: true,
+                    title: info.title,
+                    thumbnail: info.thumbnail,
+                    streamUrl: `/api/proxy?url=${encodeURIComponent(info.url)}`,
+                    formats: info.formats?.filter((f: any) => f.url).map((f: any) => ({
+                        url: `/api/proxy?url=${encodeURIComponent(f.url)}`,
+                        ext: f.ext,
+                        note: f.format_note || f.quality || 'Auto',
+                        acodec: f.acodec,
+                        vcodec: f.vcodec
+                    }))
+                });
+            }
 
         } else {
             return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
