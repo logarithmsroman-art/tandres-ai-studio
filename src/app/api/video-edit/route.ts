@@ -12,10 +12,10 @@ ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
 // --- STEALTH MIRROR RESOLVER CONFIG ---
 const MIRRORS = [
-    'https://api.cobalt.tools/api/json',
-    'https://api.v2.cobalt.tools/api/json',
-    'https://cobalt-api.l-m.workers.dev/api/json',
-    'https://co.wuk.sh/api/json'
+    'https://api.cobalt.tools',
+    'https://cobalt.meowing.de',
+    'https://cobalt.canine.tools',
+    'https://api.v2.cobalt.tools'
 ];
 
 async function mirroredResolve(url: string, isAudioOnly = false) {

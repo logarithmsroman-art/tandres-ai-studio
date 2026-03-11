@@ -158,10 +158,10 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
             } else {
                 // CLIENT-SIDE MIRROR RESOLUTION (Zero Cost)
                 const mirrored_endpoints = [
-                    'https://api.cobalt.tools/api/json',
-                    'https://api.v2.cobalt.tools/api/json',
-                    'https://cobalt-api.l-m.workers.dev/api/json',
-                    'https://co.wuk.sh/api/json'
+                    'https://api.cobalt.tools',
+                    'https://cobalt.meowing.de',
+                    'https://cobalt.canine.tools',
+                    'https://api.v2.cobalt.tools'
                 ];
 
                 let successfulData = null;
@@ -178,13 +178,15 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                                 videoQuality: '1080',
                                 audioFormat: isAudioOnly ? 'mp3' : 'best',
                                 downloadMode: isAudioOnly ? 'audio' : 'video',
-                                isAudioOnly: isAudioOnly
+                                isAudioOnly: isAudioOnly,
+                                filenameStyle: 'nerdy'
                             }),
                             signal: AbortSignal.timeout(8000)
                         });
 
                         if (mRes.ok) {
                             successfulData = await mRes.json();
+                            if (successfulData.status === 'error') throw new Error(successfulData.text);
                             break;
                         }
                     } catch (e) {
