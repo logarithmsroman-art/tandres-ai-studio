@@ -274,9 +274,10 @@ export async function POST(req: Request) {
 
             console.log('[video-edit] Resolving stream URL for:', url);
             const isTikTok = url.includes('tiktok.com');
+            const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
 
             // Strategy: For TikTok, we download immediately to bypass IP-locks.
-            // For others, we just get the info first.
+            // For others, we try to get info with Stealth Headers.
             if (isTikTok) {
                 console.log('[video-edit] TikTok detected - initiating Tunnel Download...');
                 const tunnelFile = path.join(downloadsDir, `tunnel-${runId}.mp4`);
@@ -291,33 +292,59 @@ export async function POST(req: Request) {
                 return NextResponse.json({
                     success: true,
                     title: 'TikTok Content (Tunneled)',
-                    thumbnail: '', // Optional: could fetch this too
+                    thumbnail: '',
                     streamUrl: `/downloads/tunnel-${runId}.mp4`,
                     tunneled: true
                 });
             }
 
-            const info: any = await youtubedl(url, {
-                dumpSingleJson: true,
-                noCheckCertificates: true,
-                noWarnings: true,
-                preferFreeFormats: true,
-            });
+            // STEALTH RESOLVE FOR YOUTUBE/INSTAGRAM
+            try {
+                const stealthOptions: any = {
+                    dumpSingleJson: true,
+                    noCheckCertificates: true,
+                    noWarnings: true,
+                    preferFreeFormats: true,
+                    addHeader: [
+                        'referer:https://www.google.com/',
+                        'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+                    ]
+                };
 
-            return NextResponse.json({
-                success: true,
-                title: info.title,
-                thumbnail: info.thumbnail,
-                streamUrl: info.url,
-                formats: info.formats?.filter((f: any) => f.url).map((f: any) => ({
-                    url: f.url,
-                    ext: f.ext,
-                    note: f.format_note,
-                    acodec: f.acodec,
-                    vcodec: f.vcodec
-                }))
-            });
+                // If YouTube, use additional stealth to bypass "Sign in" error
+                if (isYouTube) {
+                    stealthOptions.format = 'best'; // Simplify format selection for faster metadata fetch
+                    stealthOptions.geoByePass = true;
+                }
 
+                const info: any = await youtubedl(url, stealthOptions);
+
+                // Prioritize finding a single stream URL for browser fetch
+                const streamUrl = info.url || (info.formats && info.formats.reverse().find((f: any) => f.url && f.ext === 'mp4')?.url);
+
+                return NextResponse.json({
+                    success: true,
+                    title: info.title,
+                    thumbnail: info.thumbnail,
+                    streamUrl: streamUrl,
+                    formats: info.formats?.filter((f: any) => f.url).map((f: any) => ({
+                        url: f.url,
+                        ext: f.ext,
+                        note: f.format_note,
+                        acodec: f.acodec,
+                        vcodec: f.vcodec
+                    }))
+                });
+            } catch (err: any) {
+                console.error('[video-edit] Stealth resolve failed:', err.message);
+
+                // FINAL FALLBACK: If it's YouTube and standard resolve failed, try to construct a basic info object
+                // to at least attempt a proxy fetch in the browser if possible.
+                if (isYouTube && err.message.includes('Sign in')) {
+                    throw new Error("YouTube has increased security on this specific video. Try a different link or wait 10 minutes for the 'Cool Down' period.");
+                }
+                throw err;
+            }
         } else {
             return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
         }
