@@ -77,6 +77,60 @@ export async function POST(req: Request) {
             }
         }
 
+        // --- SUBSCRIPTION & TIKTOK VALIDATION ---
+        if (url && (action === 'download-video' || action === 'extract-audio' || action === 'magic-extract' || action === 'resolve-url')) {
+            let tier = 'free';
+            let userProfile: any = null;
+            let isTikTok = url.includes('tiktok.com');
+
+            if (userId) {
+                const { createClient } = require('@supabase/supabase-js');
+                const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+                const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
+                userProfile = data;
+                if (userProfile?.subscription_tier) tier = userProfile.subscription_tier;
+            }
+
+            let maxDuration = tier === 'pro' ? 54000 : (tier === 'starter' ? 3600 : 900); // 15h, 1h, 15m
+            if (isTikTok) {
+                maxDuration = tier === 'pro' ? 600 : (tier === 'starter' ? 300 : 90); // 10m, 5m, 1.5m
+
+                if (tier !== 'free') {
+                    if (!userProfile || userProfile.tiktok_extractions_remaining <= 0) {
+                        return NextResponse.json({ error: 'No TikTok extractions remaining in your active plan.' }, { status: 403 });
+                    }
+                }
+            }
+
+            // Attempt to pre-fetch duration to validate against limits
+            try {
+                const info: any = await youtubedl(url, {
+                    dumpSingleJson: true,
+                    noCheckCertificates: true,
+                    noWarnings: true,
+                    preferFreeFormats: true,
+                });
+
+                const videoDuration = info?.duration || 0;
+                if (videoDuration > maxDuration) {
+                    return NextResponse.json({ error: `Video (${Math.floor(videoDuration / 60)}m) exceeds your plan's maximum duration limit of ${maxDuration / 60}m.` }, { status: 403 });
+                }
+            } catch (e: any) {
+                console.log('[video-edit] Pre-fetch duration check bypassed or failed:', e.message);
+            }
+
+            // Deduct TikTok count ONLY if this is the actual extraction action, not just a resolve
+            if (isTikTok && userProfile && tier !== 'free' && action !== 'resolve-url') {
+                const { createClient } = require('@supabase/supabase-js');
+                const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+                await sb.from('profiles').update({
+                    tiktok_extractions_remaining: Math.max(0, userProfile.tiktok_extractions_remaining - 1)
+                }).eq('id', userId);
+                console.log(`[video-edit] Deducted TikTok balance for user ${userId}. Remaining: ${userProfile.tiktok_extractions_remaining - 1}`);
+            }
+        }
+        // --- END VALIDATION ---
+
         if (action === 'download-video') {
             if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
 

@@ -2,7 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Upload, Play, Download, Trash2, Cpu, AlertCircle, CheckCircle2, Music } from 'lucide-react';
+import { Mic, Upload, Play, Download, Trash2, Cpu, AlertCircle, CheckCircle2, Music, Sparkles, Zap, ArrowLeft, Loader2 } from 'lucide-react';
+import AdGate from './AdGate';
+import { supabase } from '@/lib/supabase';
+import PaymentModal from './PaymentModal';
 
 const CHARACTER_LIMIT = 500;
 
@@ -18,23 +21,26 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
     const [resultAudio, setResultAudio] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showLimitAlert, setShowLimitAlert] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
+    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Track daily usage (10 ops limit) - Shared stats key
-    const checkDailyLimit = () => {
-        const today = new Date().toDateString();
-        const stats = JSON.parse(localStorage.getItem('tandres_usage_stats') || '{}');
-        if (stats.date !== today) {
-            return { count: 0, date: today };
-        }
-        return stats;
+    const fetchProfile = async () => {
+        if (!userId) return;
+        const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        if (data) setProfile(data);
     };
 
-    const incrementUsage = () => {
-        const stats = checkDailyLimit();
-        stats.count += 1;
-        localStorage.setItem('tandres_usage_stats', JSON.stringify(stats));
-    };
+    useEffect(() => {
+        fetchProfile();
+    }, [userId]);
+
+    // Removed awardCredit and handleEarnCredits as ads no longer apply to Voice Clone
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -66,14 +72,21 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
             return;
         }
 
-        // Daily Actions Limit (10)
-        const usage = checkDailyLimit();
-        if (usage.count >= 10) {
-            setError('Daily limit of 10 studio actions reached. Come back tomorrow!');
+        // Strict Paid Credit Check (Gold)
+        if ((profile?.credits || 0) <= 0) {
+            setError('0 Gold Credits remaining. Top up required to generate this voice.');
+            setIsPaymentOpen(true);
             return;
         }
 
+        // Logic for deducting paid credits (handled in executeGeneration or via separate API)
+
+        executeGeneration();
+    };
+
+    const executeGeneration = async () => {
         setLoading(true);
+        setError(null);
 
         try {
             const res = await fetch('/api/voice-clone', {
@@ -87,7 +100,6 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
             if (!data.url) throw new Error('No audio URL returned.');
 
             setResultAudio(data.url);
-            incrementUsage();
             if (onSuccess) onSuccess();
         } catch (err: any) {
             setError(err.message);
@@ -207,11 +219,19 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
             {/* Action Bar */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 pt-4">
                 <div className="flex flex-col max-w-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Cpu className="w-4 h-4 text-purple-400" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Fish Speech Engine v1.5</span>
+                    <div className="flex flex-col max-w-sm">
+                        <div className="flex items-center gap-3 px-4 py-2 bg-white/[0.03] border border-white/10 rounded-2xl w-fit group">
+                            <Zap className={`w-4 h-4 transition-colors ${(profile?.credits || 0) > 0 ? 'text-purple-400' : 'text-red-400 animate-pulse'}`} />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                                    {(profile?.credits || 0)} Gold Credits Remaining
+                                </span>
+                                {(profile?.credits || 0) === 0 && (
+                                    <span className="text-[8px] font-bold uppercase tracking-widest text-red-500/60 -mt-0.5">0 Gold Credits remaining. Top-up required</span>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <p className="text-xs text-white/20 font-medium">This generation will consume 1 credit from your balance.</p>
                 </div>
 
                 <button
@@ -244,8 +264,8 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
                             <div className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-[ping_1.5s_infinite_0.3s]" />
                             <div className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-[ping_1.5s_infinite_0.6s]" />
                         </div>
-                        <h4 className="text-xl font-bold tracking-tight">Model is reasoning...</h4>
-                        <p className="text-white/30 text-sm max-w-sm">Generating your audio across our decentralized GPU cluster. Thank you for your patience.</p>
+                        <h4 className="text-xl font-bold tracking-tight">Generating your voice...</h4>
+                        <p className="text-white/30 text-sm max-w-sm">Please wait while we process your audio. This usually takes 10-30 seconds.</p>
                     </motion.div>
                 )}
 
@@ -290,6 +310,15 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Payment Modal Integration */}
+            <PaymentModal
+                isOpen={isPaymentOpen}
+                onClose={() => setIsPaymentOpen(false)}
+                userEmail={profile?.email || ''}
+                userId={userId || ''}
+                onSuccess={fetchProfile}
+            />
         </div>
     );
 }

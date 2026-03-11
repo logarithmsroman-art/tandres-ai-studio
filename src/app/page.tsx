@@ -8,11 +8,14 @@ import dynamic from 'next/dynamic';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
+import { Sparkles } from 'lucide-react';
+import AdGate from '@/components/AdGate';
 
 const PaymentModal = dynamic(() => import('@/components/PaymentModal'), { ssr: false });
 
 type Profile = {
   credits: number;
+  free_credits: number;
   subscription_tier: string;
 };
 
@@ -23,6 +26,7 @@ export default function Home() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [showAdForCredits, setShowAdForCredits] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -60,7 +64,7 @@ export default function Home() {
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('credits, subscription_tier')
+      .select('credits, free_credits, subscription_tier')
       .eq('id', userId)
       .single();
 
@@ -155,11 +159,28 @@ export default function Home() {
                 <div className="flex items-center gap-8">
                   {user ? (
                     <>
-                      <div className="px-5 py-2.5 bg-white/[0.03] border border-white/10 rounded-2xl flex items-center gap-3 transition-colors hover:bg-white/[0.06]">
-                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)] animate-pulse" />
-                        <span className="text-xs font-bold text-white/50 tracking-tight">
-                          Credits: <span className="text-white ml-1">{profile?.credits ?? 0}</span>
-                        </span>
+                      <div className="flex items-center gap-3 px-6 py-3 bg-white/[0.03] border border-white/10 rounded-2xl transition-all hover:bg-white/[0.06] group/wallet">
+                        <div className="flex flex-col items-end border-r border-white/10 pr-3 mr-1">
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${profile?.subscription_tier !== 'free' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]'} animate-pulse`} />
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest">
+                              Gold: {profile?.credits ?? 0}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_10px_rgba(161,161,170,0.4)] animate-pulse" />
+                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{profile?.free_credits ?? 0} Silver</span>
+                          </div>
+                          <button
+                            onClick={() => setShowAdForCredits(true)}
+                            className="px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-lg text-[9px] font-black text-purple-400 uppercase tracking-widest hover:bg-purple-500/20 transition-all flex items-center gap-1.5"
+                          >
+                            <Sparkles className="w-2.5 h-2.5 animate-pulse" />
+                            Earn
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <button
@@ -276,7 +297,6 @@ export default function Home() {
               <div className="relative z-10">
                 <UnifiedMediaStudio
                   userId={user?.id}
-                  onSuccess={() => user && fetchProfile(user.id)}
                 />
               </div>
             </div>
@@ -289,9 +309,24 @@ export default function Home() {
                 onClose={() => setIsPaymentOpen(false)}
                 userEmail={user.email!}
                 userId={user.id}
+                currentTier={profile?.subscription_tier}
                 onSuccess={() => fetchProfile(user.id)}
               />
             )}
+
+            <AdGate
+              isOpen={showAdForCredits}
+              onClose={() => setShowAdForCredits(false)}
+              onComplete={async () => {
+                if (user) {
+                  const res = await fetch('/api/free-credits', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: user.id, action: 'get' })
+                  });
+                  if (res.ok) fetchProfile(user.id);
+                }
+              }}
+            />
 
             <AnimatePresence>
               {isLogoutConfirmOpen && (
@@ -342,7 +377,7 @@ export default function Home() {
 
             <footer className="py-12 px-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-4 grayscale opacity-40">
-                <span className="text-xs font-bold tracking-widest uppercase">Powered by Fish Speech & Replicate</span>
+                <span className="text-xs font-bold tracking-widest uppercase">Tandres Simplicity AI Studio</span>
               </div>
               <div className="flex items-center gap-8 text-[10px] uppercase font-bold tracking-[0.2em] text-white/20">
                 <a href="#" className="hover:text-white transition-colors">Terms</a>

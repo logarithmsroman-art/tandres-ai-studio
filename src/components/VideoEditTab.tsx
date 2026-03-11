@@ -1,697 +1,992 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { toBlobURL, fetchFile } from '@ffmpeg/util';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Video, Download, Scissors, Music, Zap, Trash2, ArrowRight, CheckCircle2, AlertCircle, FileAudio, Layout, Upload, Plus, Play, Pause, GripVertical, Trash, Volume2 } from 'lucide-react';
+import {
+    Beaker, Upload, Play, Download, Loader2,
+    CheckCircle2, AlertCircle, Scissors, Plus,
+    Music, Video, Zap, Trash2, Clock, Link as LinkIcon,
+    Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft
+} from 'lucide-react';
+import AdGate from './AdGate';
+import { supabase } from '@/lib/supabase';
+import Link from 'next/link';
 
-type VideoAction = 'download-video' | 'extract-audio' | 'trim-audio' | 'magic-extract' | 'merge-audio';
+type ToolType = 'audio-extractor' | 'video-extractor' | 'trimmer' | 'joiner' | 'magic-sync';
 
-interface VideoEditTabProps {
-    userId?: string;
-    onSuccess?: () => void;
+interface StreamInfo {
+    title: string;
+    thumbnail: string;
+    url: string;
+    formats?: any[];
 }
 
-export default function VideoEditTab({ userId, onSuccess }: VideoEditTabProps) {
-    const [url, setUrl] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<{ url?: string; videoUrl?: string; audioUrl?: string; type?: string } | null>(null);
+export default function VideoEditTab({ userId, onSuccess }: { userId?: string, onSuccess?: () => void }) {
+    const [loaded, setLoaded] = useState(false);
+    const [processing, setProcessing] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [outputUrl, setOutputUrl] = useState<string | null>(null);
+    const [outputAudioUrl, setOutputAudioUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [action, setAction] = useState<VideoAction>('download-video');
-    const [showLimitAlert, setShowLimitAlert] = useState(false);
-    const [file, setFile] = useState<File | null>(null);
-    const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
-    const [startTime, setStartTime] = useState(0);
-    const [duration, setDuration] = useState(10);
-    const [totalDuration, setTotalDuration] = useState(0);
-    const [tracks, setTracks] = useState<{ id: string; file: File; url: string; name: string }[]>([]);
-    const [isPlayingAll, setIsPlayingAll] = useState(false);
-    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const multiFileInputRef = useRef<HTMLInputElement>(null);
-    const audioRef = useRef<HTMLAudioElement>(null);
-    const trackRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
+    const [currentTool, setCurrentTool] = useState<ToolType>('audio-extractor');
+    const [showAd, setShowAd] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
+    const [isSpending, setIsSpending] = useState(false);
 
-    // Track daily usage (10 ops limit)
-    const checkDailyLimit = () => {
-        const today = new Date().toDateString();
-        const stats = JSON.parse(localStorage.getItem('tandres_usage_stats') || '{}');
-        if (stats.date !== today) {
-            return { count: 0, date: today };
-        }
-        return stats;
-    };
+    // Inputs
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [pastedUrl, setPastedUrl] = useState('');
+    const [isResolving, setIsResolving] = useState(false);
+    const [resolvedInfo, setResolvedInfo] = useState<StreamInfo | null>(null);
 
-    const incrementUsage = () => {
-        const stats = checkDailyLimit();
-        stats.count += 1;
-        localStorage.setItem('tandres_usage_stats', JSON.stringify(stats));
-    };
+    // Trimmer state (CapCut-style)
+    const [trimAudioUrl, setTrimAudioUrl] = useState<string | null>(null);
+    const [trimDuration, setTrimDuration] = useState(0);
+    const [trimCurrentTime, setTrimCurrentTime] = useState(0);
+    const [trimPlaying, setTrimPlaying] = useState(false);
+    const [markStart, setMarkStart] = useState<number | null>(null);
+    const [markEnd, setMarkEnd] = useState<number | null>(null);
+    const trimAudioRef = useRef<HTMLAudioElement>(null);
+    const trimWaveformRef = useRef<HTMLCanvasElement>(null);
+    const trimProgressRef = useRef<HTMLDivElement>(null);
 
-    const actions = [
-        { id: 'download-video', label: 'Video Extractor', icon: <Download className="w-5 h-5" />, desc: 'Save and download high-quality videos from any URL.' },
-        { id: 'extract-audio', label: 'Audio Extractor', icon: <Music className="w-5 h-5" />, desc: 'Instantly pull the MP3 track from any video file.' },
-        { id: 'trim-audio', label: 'Audio Cut', icon: <Scissors className="w-5 h-5" />, desc: 'Cut out any part of your song or audio perfectly.' },
-        { id: 'magic-extract', label: 'Magic Sync (A+V)', icon: <Zap className="w-5 h-5" />, desc: 'Download a video and extract its master audio track in one click.' },
-        { id: 'merge-audio', label: 'Audio Joiner', icon: <Layout className="w-5 h-5" />, desc: 'Join multiple audios together to play one after the other.' }
-    ];
+    // Joiner state (CapCut-style)
+    const [joinerTracks, setJoinerTracks] = useState<{ id: string; file: File; url: string; name: string; duration: number }[]>([]);
+    const [joinerPlayingId, setJoinerPlayingId] = useState<string | null>(null);
+    const [joinerPreviewPlaying, setJoinerPreviewPlaying] = useState(false);
+    const [joinerPreviewIndex, setJoinerPreviewIndex] = useState(0);
+    const joinerAudioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = e.target.files?.[0];
-        if (selectedFile) {
-            if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl); // Cleanup old URL
+    const ffmpegRef = useRef<FFmpeg | null>(null);
 
-            const pUrl = URL.createObjectURL(selectedFile);
-            setFile(selectedFile);
-            setFilePreviewUrl(pUrl);
-            setUrl(''); // Clear URL if file is selected
-            setStartTime(0);
-        }
-    };
-
-    const handleSeek = (time: number) => {
-        setStartTime(time);
-        if (audioRef.current) {
-            audioRef.current.currentTime = time;
-        }
-    };
-
-    const handleTrackAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        const validTracks: { id: string; file: File; url: string; name: string }[] = [];
-        let hasTooLong = false;
-
-        for (const file of files) {
-            // Create a temporary audio element to check duration
-            const duration = await new Promise<number>((resolve) => {
-                const audio = new Audio();
-                audio.src = URL.createObjectURL(file);
-                audio.onloadedmetadata = () => {
-                    URL.revokeObjectURL(audio.src);
-                    resolve(audio.duration);
-                };
-            });
-
-            if (duration > 90) {
-                hasTooLong = true;
-                continue;
-            }
-
-            validTracks.push({
-                id: Math.random().toString(36).substr(2, 9),
-                file: file,
-                url: URL.createObjectURL(file),
-                name: file.name
-            });
-        }
-
-        if (hasTooLong) {
-            setError("Some tracks were skipped. Max duration per track is 1 minute 30 seconds.");
-        }
-
-        if (validTracks.length > 0) {
-            setTracks([...tracks, ...validTracks]);
-        }
-    };
-
-    const handleTrackRemove = (id: string, url: string) => {
-        URL.revokeObjectURL(url);
-        setTracks(tracks.filter(t => t.id !== id));
-    };
-
-    const moveTrack = (index: number, direction: 'up' | 'down') => {
-        const newTracks = [...tracks];
-        const targetIndex = direction === 'up' ? index - 1 : index + 1;
-        if (targetIndex < 0 || targetIndex >= tracks.length) return;
-        [newTracks[index], newTracks[targetIndex]] = [newTracks[targetIndex], newTracks[index]];
-        setTracks(newTracks);
-    };
-
-    const togglePlayAll = () => {
-        if (isPlayingAll) {
-            Object.values(trackRefs.current).forEach(audio => audio?.pause());
-            setIsPlayingAll(false);
-            setPreviewIndex(null);
-        } else {
-            if (tracks.length === 0) return;
-            setIsPlayingAll(true);
-            setPreviewIndex(0);
-            const firstAudio = trackRefs.current[tracks[0].id];
-            if (firstAudio) {
-                firstAudio.currentTime = 0;
-                firstAudio.play();
-            }
-        }
-    };
-
-    const handleTrackEnd = (index: number) => {
-        if (!isPlayingAll) return;
-
-        const nextIndex = index + 1;
-        if (nextIndex < tracks.length) {
-            setPreviewIndex(nextIndex);
-            const nextAudio = trackRefs.current[tracks[nextIndex].id];
-            if (nextAudio) {
-                nextAudio.currentTime = 0;
-                nextAudio.play();
-            }
-        } else {
-            setIsPlayingAll(false);
-            setPreviewIndex(null);
-        }
-    };
-    const handleAction = async () => {
-        if (!url && !file && tracks.length === 0) return;
-
-        // Reset result immediately on run
-        setResult(null);
-        setError(null);
-        setShowLimitAlert(false);
-
-        // Guest Limit Check
-        if (!userId && localStorage.getItem('tandres_guest_used')) {
-            setShowLimitAlert(true);
-            setError('Guest limit reached. Please login to use Studio tools.');
-            return;
-        }
-
-        // Daily Actions Limit (10)
-        const usage = checkDailyLimit();
-        if (usage.count >= 10) {
-            setError('Daily limit of 10 studio actions reached. Come back tomorrow!');
-            return;
-        }
-
-        setLoading(true);
-
+    const load = async () => {
         try {
-            const formData = new FormData();
-            formData.append('action', action);
-            formData.append('userId', userId || '');
-
-            if (action === 'trim-audio') {
-                formData.append('startTime', startTime.toString());
-                formData.append('duration', duration.toString());
+            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+            if (!ffmpegRef.current) {
+                ffmpegRef.current = new FFmpeg();
             }
+            const ffmpeg = ffmpegRef.current;
 
-            if (action === 'merge-audio') {
-                tracks.forEach(track => {
-                    formData.append('files', track.file);
-                });
-            } else if (file) {
-                formData.append('file', file);
-            } else {
-                formData.append('url', url);
+            ffmpeg.on('log', ({ message }) => {
+                console.log('[FFmpeg Lab]', message);
+            });
+
+            ffmpeg.on('progress', ({ progress }) => {
+                setProgress(Math.round(progress * 100));
+            });
+
+            await ffmpeg.load({
+                coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+            });
+
+            setLoaded(true);
+        } catch (err: any) {
+            console.error('Failed to load FFmpeg:', err);
+            setError('Failed to initialize processing engine. Please refresh and try again.');
+        }
+    };
+
+    const fetchProfile = async () => {
+        if (!userId) return;
+        const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        if (data) setProfile(data);
+    };
+
+    const awardCredit = async () => {
+        if (!userId) return;
+        try {
+            const res = await fetch('/api/free-credits', {
+                method: 'POST',
+                body: JSON.stringify({ userId, action: 'get' })
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchProfile();
             }
+        } catch (e) {
+            console.error('Failed to award credit:', e);
+        }
+    };
 
+    const handleEarnCredits = async () => {
+        setShowAd(true);
+    };
+
+    const resolveUrl = async () => {
+        if (!pastedUrl) return;
+
+        if (pastedUrl.includes('tiktok.com') && pastedUrl.includes('/photo/')) {
+            setError("TikTok Photo Slideshows are not supported yet. Please use a Video link.");
+            return;
+        }
+
+        setIsResolving(true);
+        setError(null);
+        try {
             const res = await fetch('/api/video-edit', {
                 method: 'POST',
-                body: formData,
+                body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
             });
-
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Server error');
-            setResult(data);
-            incrementUsage();
-
-            // Mark guest try as used
-            if (!userId) {
-                localStorage.setItem('tandres_guest_used', 'true');
+            if (data.success) {
+                setResolvedInfo({
+                    title: data.title,
+                    thumbnail: data.thumbnail,
+                    url: data.streamUrl,
+                    formats: data.formats
+                });
+            } else {
+                throw new Error(data.error || 'Failed to resolve link');
             }
-
-            if (onSuccess) onSuccess();
         } catch (err: any) {
             setError(err.message);
         } finally {
-            setLoading(false);
+            setIsResolving(false);
         }
     };
 
-    return (
-        <div className="flex flex-col gap-12 max-w-5xl mx-auto relative">
-            {/* Floating Limit Alert */}
-            <AnimatePresence>
-                {showLimitAlert && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -50, scale: 0.9 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -50, scale: 0.9 }}
-                        className="fixed top-8 right-8 z-[100] w-96 bg-blue-600 border border-blue-400 p-8 rounded-[2rem] shadow-2xl flex flex-col gap-4 group"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 bg-white/20 rounded-2xl flex items-center justify-center text-white">
-                                <Zap className="w-6 h-6 animate-pulse" />
-                            </div>
-                            <div>
-                                <h4 className="font-black uppercase tracking-widest text-white text-sm">Limit Reached</h4>
-                                <p className="text-white/60 text-[10px] font-bold">Log in to unlock the Studio</p>
-                            </div>
-                            <button onClick={() => setShowLimitAlert(false)} className="ml-auto text-white/40 hover:text-white transition-colors">
-                                <Trash2 className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <p className="text-white text-sm font-medium leading-relaxed">
-                            You've exhausted your free guest limits. Login to continue using our AI Voice and Video extraction tools.
-                        </p>
-                        <button
-                            onClick={() => {
-                                setShowLimitAlert(false);
-                                // Trigger auth modal via global event or state if possible, 
-                                // but for now just hide and let user click ENTER STUDIO
-                            }}
-                            className="bg-white text-blue-600 h-12 rounded-xl font-black uppercase tracking-widest text-xs hover:scale-105 active:scale-95 transition-all shadow-xl"
-                        >
-                            Log In Now
-                        </button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+    // === TRIMMER FUNCTIONS ===
+    const handleTrimFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (trimAudioUrl) URL.revokeObjectURL(trimAudioUrl);
+        const url = URL.createObjectURL(file);
+        setTrimAudioUrl(url);
+        setSelectedFiles([file]);
+        setMarkStart(null);
+        setMarkEnd(null);
+        setTrimCurrentTime(0);
+    };
 
-            {/* Top Section: Action Selector Layout */}
-            <div className="flex flex-col gap-8">
-                <label className="block text-xs font-black uppercase tracking-[0.2em] text-white/30 ml-2">Studio Tools</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                    {actions.map((act) => (
-                        <button
-                            key={act.id}
-                            onClick={() => {
-                                setAction(act.id as VideoAction);
-                                setFile(null); // Reset file when changing tools
-                                setUrl('');
-                            }}
-                            className={`group flex flex-col p-6 rounded-3xl border transition-all text-left relative overflow-hidden active:scale-95 ${action === act.id ? 'bg-blue-600 border-blue-500 shadow-xl shadow-blue-900/40 text-white translate-y-[-4px]' : 'bg-white/[0.02] border-white/5 text-white/40 hover:bg-white/10 hover:border-white/20'}`}
+    const toggleTrimPlay = () => {
+        if (!trimAudioRef.current) return;
+        if (trimPlaying) {
+            trimAudioRef.current.pause();
+        } else {
+            trimAudioRef.current.play();
+        }
+        setTrimPlaying(!trimPlaying);
+    };
+
+    const handleTrimSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!trimProgressRef.current || !trimAudioRef.current) return;
+        const rect = trimProgressRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const pct = x / rect.width;
+        const time = pct * trimDuration;
+        trimAudioRef.current.currentTime = time;
+        setTrimCurrentTime(time);
+    };
+
+    const handleMarkStart = () => {
+        setMarkStart(trimCurrentTime);
+        if (markEnd !== null && trimCurrentTime >= markEnd) {
+            setMarkEnd(null);
+        }
+    };
+
+    const handleMarkEnd = () => {
+        if (markStart === null) {
+            setError("Mark the start point first.");
+            return;
+        }
+        if (trimCurrentTime <= markStart) {
+            setError("End point must be after the start point.");
+            return;
+        }
+        setMarkEnd(trimCurrentTime);
+    };
+
+    const formatTime = (sec: number) => {
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    // === JOINER FUNCTIONS ===
+    const handleJoinerAdd = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        const newTracks: typeof joinerTracks = [];
+
+        for (const file of files) {
+            const dur = await new Promise<number>((resolve) => {
+                const audio = new Audio();
+                audio.src = URL.createObjectURL(file);
+                audio.onloadedmetadata = () => {
+                    const d = audio.duration;
+                    URL.revokeObjectURL(audio.src);
+                    resolve(d);
+                };
+            });
+
+            newTracks.push({
+                id: Math.random().toString(36).substr(2, 9),
+                file,
+                url: URL.createObjectURL(file),
+                name: file.name,
+                duration: dur
+            });
+        }
+
+        setJoinerTracks(prev => [...prev, ...newTracks]);
+    };
+
+    const removeJoinerTrack = (id: string) => {
+        const track = joinerTracks.find(t => t.id === id);
+        if (track) URL.revokeObjectURL(track.url);
+        setJoinerTracks(prev => prev.filter(t => t.id !== id));
+    };
+
+    const toggleJoinerTrackPlay = (id: string) => {
+        const audio = joinerAudioRefs.current[id];
+        if (!audio) return;
+
+        if (joinerPlayingId === id) {
+            audio.pause();
+            setJoinerPlayingId(null);
+        } else {
+            // Stop any currently playing
+            if (joinerPlayingId) {
+                joinerAudioRefs.current[joinerPlayingId]?.pause();
+            }
+            audio.currentTime = 0;
+            audio.play();
+            setJoinerPlayingId(id);
+        }
+    };
+
+    const playJoinerPreview = () => {
+        if (joinerTracks.length === 0) return;
+
+        if (joinerPreviewPlaying) {
+            // Stop all
+            Object.values(joinerAudioRefs.current).forEach(a => a?.pause());
+            setJoinerPreviewPlaying(false);
+            setJoinerPlayingId(null);
+            return;
+        }
+
+        setJoinerPreviewPlaying(true);
+        setJoinerPreviewIndex(0);
+        const first = joinerAudioRefs.current[joinerTracks[0].id];
+        if (first) { first.currentTime = 0; first.play(); }
+        setJoinerPlayingId(joinerTracks[0].id);
+    };
+
+    const handleJoinerTrackEnd = (trackId: string) => {
+        if (!joinerPreviewPlaying) {
+            setJoinerPlayingId(null);
+            return;
+        }
+        const idx = joinerTracks.findIndex(t => t.id === trackId);
+        const nextIdx = idx + 1;
+        if (nextIdx < joinerTracks.length) {
+            setJoinerPreviewIndex(nextIdx);
+            const next = joinerAudioRefs.current[joinerTracks[nextIdx].id];
+            if (next) { next.currentTime = 0; next.play(); }
+            setJoinerPlayingId(joinerTracks[nextIdx].id);
+        } else {
+            setJoinerPreviewPlaying(false);
+            setJoinerPlayingId(null);
+        }
+    };
+
+    // === FILE SELECT (for audio extractor) ===
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const newFiles = Array.from(e.target.files);
+            setSelectedFiles([newFiles[0]]);
+            setResolvedInfo(null);
+        }
+    };
+
+    const removeFile = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // === MAIN ENGINE ===
+    const runEngine = async () => {
+        const hasInput = selectedFiles.length > 0 || (resolvedInfo && resolvedInfo.url) || joinerTracks.length > 0;
+        if (!hasInput || !loaded) return;
+
+        setOutputAudioUrl(null);
+
+        // Ad Gate Business Logic
+        if (profile?.subscription_tier === 'free') {
+            if ((profile?.free_credits || 0) > 0) {
+                setIsSpending(true);
+                try {
+                    const res = await fetch('/api/free-credits', {
+                        method: 'POST',
+                        body: JSON.stringify({ userId, action: 'spend' })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Failed to spend credit');
+                    fetchProfile();
+                } catch (e: any) {
+                    setError(e.message);
+                    setIsSpending(false);
+                    return;
+                } finally {
+                    setIsSpending(false);
+                }
+            } else {
+                setShowAd(true);
+                return;
+            }
+        }
+
+        executeEngine();
+    };
+
+    const executeEngine = async () => {
+        setProcessing(true);
+        try {
+            const ffmpeg = ffmpegRef.current;
+            if (!ffmpeg) return;
+
+            let inputSource: any;
+            let inputName = 'input.mp4';
+            let fileExt = '.mp4';
+
+            if (currentTool !== 'joiner') {
+                if (selectedFiles.length > 0) {
+                    inputSource = await fetchFile(selectedFiles[0]);
+                    fileExt = selectedFiles[0].name.substring(selectedFiles[0].name.lastIndexOf('.')) || '.mp4';
+                    inputName = 'input' + fileExt;
+                } else if (resolvedInfo) {
+                    const isTunneled = resolvedInfo.url.startsWith('/downloads');
+                    const fetchUrl = isTunneled
+                        ? `/api/serve-media?file=${encodeURIComponent(resolvedInfo.url)}`
+                        : `/api/proxy?url=${encodeURIComponent(resolvedInfo.url)}`;
+                    inputSource = await fetchFile(fetchUrl);
+                    inputName = 'input.mp4';
+                }
+                await ffmpeg.writeFile(inputName, inputSource);
+            }
+
+            if (currentTool === 'audio-extractor') {
+                const outputName = 'output.mp3';
+                await ffmpeg.exec(['-i', inputName, '-vn', '-acodec', 'libmp3lame', outputName]);
+                const data = await ffmpeg.readFile(outputName);
+                setOutputUrl(URL.createObjectURL(new Blob([data as any], { type: 'audio/mp3' })));
+            }
+
+            else if (currentTool === 'video-extractor') {
+                const outputName = 'video-out.mp4';
+                await ffmpeg.exec(['-i', inputName, '-c', 'copy', outputName]);
+                const data = await ffmpeg.readFile(outputName);
+                setOutputUrl(URL.createObjectURL(new Blob([data as any], { type: 'video/mp4' })));
+            }
+
+            else if (currentTool === 'trimmer') {
+                if (markStart === null || markEnd === null) {
+                    throw new Error('Please mark both start and end points before processing.');
+                }
+                const ss = markStart.toFixed(2);
+                const dur = (markEnd - markStart).toFixed(2);
+                const outputName = 'trimmed.mp3';
+                await ffmpeg.exec(['-ss', ss, '-i', inputName, '-t', dur, '-acodec', 'libmp3lame', outputName]);
+                const data = await ffmpeg.readFile(outputName);
+                setOutputUrl(URL.createObjectURL(new Blob([data as any], { type: 'audio/mp3' })));
+            }
+
+            else if (currentTool === 'joiner') {
+                const filterInputs: string[] = [];
+                for (let i = 0; i < joinerTracks.length; i++) {
+                    const name = `file${i}.mp3`;
+                    await ffmpeg.writeFile(name, await fetchFile(joinerTracks[i].file));
+                    filterInputs.push('-i', name);
+                }
+                const filterComplex = `concat=n=${joinerTracks.length}:v=0:a=1[a]`;
+                await ffmpeg.exec([...filterInputs, '-filter_complex', filterComplex, '-map', '[a]', 'joined.mp3']);
+                const data = await ffmpeg.readFile('joined.mp3');
+                setOutputUrl(URL.createObjectURL(new Blob([data as any], { type: 'audio/mp3' })));
+            }
+
+            else if (currentTool === 'magic-sync') {
+                // Extract both video and audio separately
+                const videoOut = 'video-out.mp4';
+                const audioOut = 'audio-out.mp3';
+                await ffmpeg.exec(['-i', inputName, '-c', 'copy', videoOut]);
+                await ffmpeg.exec(['-i', inputName, '-vn', '-acodec', 'libmp3lame', audioOut]);
+                const videoData = await ffmpeg.readFile(videoOut);
+                const audioData = await ffmpeg.readFile(audioOut);
+                setOutputUrl(URL.createObjectURL(new Blob([videoData as any], { type: 'video/mp4' })));
+                setOutputAudioUrl(URL.createObjectURL(new Blob([audioData as any], { type: 'audio/mp3' })));
+            }
+
+            setProcessing(false);
+        } catch (err: any) {
+            console.error('Processing error:', err);
+            setError(err.message || 'Processing failed. Please try again.');
+            setProcessing(false);
+        }
+    };
+
+    useEffect(() => {
+        load();
+        fetchProfile();
+    }, [userId]);
+
+    const tools = [
+        { id: 'audio-extractor', name: 'Audio Extraction', icon: Music, desc: 'Extract crystal-clear audio from any video link or local file.' },
+        { id: 'video-extractor', name: 'Video Extraction', icon: Video, desc: 'Extract high-quality video directly from YouTube, Instagram, or TikTok.' },
+        { id: 'trimmer', name: 'Audio Trimmer', icon: Scissors, desc: 'Clip your audio tracks with studio-level accuracy.' },
+        { id: 'joiner', name: 'Audio Joiner', icon: Plus, desc: 'Seamlessly merge multiple audio tracks into a single masterpiece.' },
+        { id: 'magic-sync', name: 'Magic Sync', icon: Zap, desc: 'Extract audio and video from any link at once.' },
+    ];
+
+    // Should show URL input? (not for trimmer or joiner)
+    const showUrlInput = currentTool !== 'trimmer' && currentTool !== 'joiner';
+    // Should show local upload? (not for video-extractor or magic-sync)
+    const showLocalUpload = currentTool !== 'video-extractor' && currentTool !== 'magic-sync' && currentTool !== 'joiner' && currentTool !== 'trimmer';
+
+    // Determine button label
+    const isExtractionTool = currentTool === 'audio-extractor' || currentTool === 'video-extractor' || currentTool === 'magic-sync';
+    const actionButtonLabel = isExtractionTool ? 'Extract Now' : 'Process Now';
+
+    // Can run?
+    const canRun = (() => {
+        if (currentTool === 'joiner') return joinerTracks.length >= 2;
+        if (currentTool === 'trimmer') return selectedFiles.length > 0 && markStart !== null && markEnd !== null;
+        return selectedFiles.length > 0 || !!resolvedInfo;
+    })();
+
+    return (
+        <div className="w-full text-white font-sans selection:bg-purple-500/30">
+            <div className="max-w-5xl mx-auto space-y-8">
+                {/* Header Section */}
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                        <Link
+                            href="/"
+                            className="p-4 bg-zinc-900 border border-white/5 rounded-2xl hover:bg-white/5 transition-colors group"
                         >
-                            <div className={`mb-6 h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${action === act.id ? 'bg-white shadow-xl shadow-blue-500/20 text-blue-600 animate-[bounce_1.5s_infinite]' : 'bg-white/5 text-white shadow-black/20 group-hover:scale-110'}`}>
-                                {act.icon}
+                            <ArrowLeft className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" />
+                        </Link>
+                        <div>
+                            <h1 className="text-4xl font-black tracking-tighter uppercase italic">The Lab</h1>
+                            <div className="flex items-center gap-3 mt-1">
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-md border border-purple-500/20">Studio</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Nigeria</span>
                             </div>
-                            <span className={`font-bold text-sm tracking-tight mb-2 ${action === act.id ? 'text-white' : 'text-white/60'}`}>{act.label}</span>
-                            <p className={`text-[10px] leading-relaxed font-medium uppercase tracking-widest ${action === act.id ? 'text-blue-100/60' : 'text-white/20'}`}>Select Tool</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <div className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl border transition-all duration-1000 ${loaded ? 'border-green-500/30 bg-green-500/5 text-green-400' : 'border-zinc-800 bg-zinc-900/50 text-zinc-500'}`}>
+                            <div className={`w-2 h-2 rounded-full ${loaded ? 'bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]' : 'bg-zinc-700'}`} />
+                            <span className="text-xs font-black uppercase tracking-widest">{loaded ? 'Ready' : 'Initalizing engine'}</span>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Main Tool Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                    {tools.map((tool) => (
+                        <button
+                            key={tool.id}
+                            onClick={() => {
+                                setCurrentTool(tool.id as ToolType);
+                                setSelectedFiles([]);
+                                setOutputUrl(null);
+                                setOutputAudioUrl(null);
+                                setResolvedInfo(null);
+                                setPastedUrl('');
+                                setTrimAudioUrl(null);
+                                setMarkStart(null);
+                                setMarkEnd(null);
+                                setJoinerTracks([]);
+                            }}
+                            className={`group p-5 rounded-3xl border transition-all relative overflow-hidden ${currentTool === tool.id
+                                ? 'bg-zinc-900 border-purple-500 text-white shadow-2xl shadow-purple-900/20'
+                                : 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-zinc-700 hover:bg-zinc-900/50'
+                                }`}
+                        >
+                            {currentTool === tool.id && (
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-purple-600/10 blur-2xl rounded-full" />
+                            )}
+                            <tool.icon className={`w-6 h-6 mb-4 transition-colors ${currentTool === tool.id ? 'text-purple-400' : 'group-hover:text-zinc-300'}`} />
+                            <p className="font-black text-xs uppercase tracking-widest mb-1">{tool.name}</p>
+                            <p className="text-[9px] font-bold uppercase opacity-50 tracking-tighter line-clamp-2">{tool.desc}</p>
                         </button>
                     ))}
                 </div>
-            </div>
 
-            <div className="h-[1px] w-full bg-white/5" />
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                    {/* Left Panel: Inputs & Configuration */}
+                    <div className="xl:col-span-8 flex flex-col gap-6">
+                        <div className="bg-[#0e0e0e] border border-white/5 rounded-[40px] p-8 lg:p-12 shadow-2xl relative overflow-hidden">
+                            <div className="relative space-y-10">
 
-            {/* Input Section */}
-            <div className="p-12 bg-white/[0.01] border border-white/5 rounded-[3rem] relative overflow-hidden backdrop-blur-xl">
-                <div className="relative z-10 flex flex-col gap-10">
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="h-2 w-2 rounded-full bg-blue-500" />
-                            <h3 className="text-3xl font-bold tracking-tight">Active: {actions.find(a => a.id === action)?.label}</h3>
+                                {/* URL SECTION — only for extraction tools */}
+                                {showUrlInput && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-2">
+                                                <Globe className="w-3 h-3" /> Paste Link
+                                            </h3>
+                                            {resolvedInfo && <span className="text-[10px] font-black text-green-500 uppercase flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Ready</span>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                                                <input
+                                                    type="text"
+                                                    value={pastedUrl}
+                                                    onChange={(e) => setPastedUrl(e.target.value)}
+                                                    placeholder="Paste TikTok, YouTube, IG link..."
+                                                    className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm font-medium focus:border-purple-500 focus:bg-zinc-900 outline-none transition-all"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={resolveUrl}
+                                                disabled={!pastedUrl || isResolving}
+                                                className="px-6 bg-purple-600 hover:bg-purple-500 rounded-2xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-30 flex items-center gap-2"
+                                            >
+                                                {isResolving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Extract'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* LOCAL UPLOAD — only for audio extractor */}
+                                {showLocalUpload && (
+                                    <div className="space-y-4">
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-2">
+                                            <Upload className="w-3 h-3" /> Or Upload File
+                                        </h3>
+                                        <div className="space-y-3">
+                                            <label className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-zinc-900 hover:border-purple-500/40 rounded-3xl bg-zinc-900/20 transition-all cursor-pointer group">
+                                                <input type="file" onChange={handleFileSelect} className="hidden" accept="video/*,audio/*" />
+                                                <Plus className="w-8 h-8 mb-3 text-zinc-700 group-hover:text-purple-500 transition-colors" />
+                                                <p className="text-xs font-black uppercase tracking-widest text-zinc-500">Pick File</p>
+                                            </label>
+
+                                            <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                                {selectedFiles.map((f, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-xl border border-white/5">
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            {f.type.startsWith('video') ? <Video className="w-3.5 h-3.5 text-blue-400" /> : <Music className="w-3.5 h-3.5 text-purple-400" />}
+                                                            <span className="text-[10px] font-black uppercase truncate">{f.name}</span>
+                                                        </div>
+                                                        <button onClick={() => removeFile(i)} className="p-1 hover:text-red-400 transition-colors">
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* === AUDIO TRIMMER (CapCut-Style) === */}
+                                {currentTool === 'trimmer' && (
+                                    <div className="space-y-6">
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-2">
+                                            <Upload className="w-3 h-3" /> Upload Audio File
+                                        </h3>
+                                        <label className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-zinc-900 hover:border-purple-500/40 rounded-3xl bg-zinc-900/20 transition-all cursor-pointer group">
+                                            <input type="file" onChange={handleTrimFileSelect} className="hidden" accept="audio/*" />
+                                            <Plus className="w-8 h-8 mb-3 text-zinc-700 group-hover:text-purple-500 transition-colors" />
+                                            <p className="text-xs font-black uppercase tracking-widest text-zinc-500">
+                                                {trimAudioUrl ? 'Change File' : 'Pick Audio File'}
+                                            </p>
+                                        </label>
+
+                                        {/* CapCut-Style Studio Player */}
+                                        {trimAudioUrl && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="p-8 bg-zinc-900/60 border border-white/5 rounded-[2rem] space-y-6"
+                                            >
+                                                <audio
+                                                    ref={trimAudioRef}
+                                                    src={trimAudioUrl}
+                                                    onLoadedMetadata={(e) => setTrimDuration(e.currentTarget.duration)}
+                                                    onTimeUpdate={(e) => setTrimCurrentTime(e.currentTarget.currentTime)}
+                                                    onEnded={() => setTrimPlaying(false)}
+                                                    className="hidden"
+                                                />
+
+                                                {/* Time Display */}
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-lg font-black tracking-tighter tabular-nums">{formatTime(trimCurrentTime)}</span>
+                                                    <span className="text-sm text-zinc-500 font-bold tabular-nums">{formatTime(trimDuration)}</span>
+                                                </div>
+
+                                                {/* Visual Timeline / Waveform Bar */}
+                                                <div
+                                                    ref={trimProgressRef}
+                                                    onClick={handleTrimSeek}
+                                                    className="relative h-16 bg-zinc-800 rounded-2xl cursor-pointer overflow-hidden group border border-white/5"
+                                                >
+                                                    {/* Mark Start region */}
+                                                    {markStart !== null && (
+                                                        <div
+                                                            className="absolute top-0 bottom-0 bg-green-500/20 border-l-2 border-green-500 z-10"
+                                                            style={{ left: `${(markStart / trimDuration) * 100}%`, width: markEnd !== null ? `${((markEnd - markStart) / trimDuration) * 100}%` : '2px' }}
+                                                        />
+                                                    )}
+                                                    {/* Mark End line */}
+                                                    {markEnd !== null && (
+                                                        <div
+                                                            className="absolute top-0 bottom-0 border-r-2 border-red-500 z-10"
+                                                            style={{ left: `${(markEnd / trimDuration) * 100}%` }}
+                                                        />
+                                                    )}
+
+                                                    {/* Playhead */}
+                                                    <div
+                                                        className="absolute top-0 bottom-0 w-0.5 bg-white z-20 shadow-[0_0_8px_rgba(255,255,255,0.5)]"
+                                                        style={{ left: `${(trimCurrentTime / trimDuration) * 100}%` }}
+                                                    >
+                                                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-lg" />
+                                                    </div>
+
+                                                    {/* Fake waveform visualization */}
+                                                    <div className="absolute inset-0 flex items-center justify-around px-1 opacity-30">
+                                                        {Array.from({ length: 80 }).map((_, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className="w-[2px] bg-purple-400 rounded-full"
+                                                                style={{ height: `${20 + Math.sin(i * 0.5) * 30 + Math.random() * 20}%` }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Controls */}
+                                                <div className="flex items-center gap-4">
+                                                    <button
+                                                        onClick={toggleTrimPlay}
+                                                        className="h-14 w-14 bg-white text-black rounded-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg"
+                                                    >
+                                                        {trimPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={handleMarkStart}
+                                                        className={`flex-1 h-14 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${markStart !== null ? 'bg-green-500/20 border border-green-500/40 text-green-400' : 'bg-zinc-800 border border-white/5 text-zinc-400 hover:bg-zinc-700'}`}
+                                                    >
+                                                        <Flag className="w-4 h-4" />
+                                                        {markStart !== null ? `Start: ${formatTime(markStart)}` : 'Mark Start'}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={handleMarkEnd}
+                                                        className={`flex-1 h-14 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${markEnd !== null ? 'bg-red-500/20 border border-red-500/40 text-red-400' : 'bg-zinc-800 border border-white/5 text-zinc-400 hover:bg-zinc-700'}`}
+                                                    >
+                                                        <Flag className="w-4 h-4" />
+                                                        {markEnd !== null ? `End: ${formatTime(markEnd)}` : 'Mark End'}
+                                                    </button>
+                                                </div>
+
+                                                {/* Selection Info */}
+                                                {markStart !== null && markEnd !== null && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-between"
+                                                    >
+                                                        <span className="text-xs font-black uppercase tracking-widest text-purple-400">
+                                                            Selected: {formatTime(markStart)} → {formatTime(markEnd)}
+                                                        </span>
+                                                        <span className="text-xs font-bold text-white/60">
+                                                            Duration: {formatTime(markEnd - markStart)}
+                                                        </span>
+                                                    </motion.div>
+                                                )}
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* === AUDIO JOINER (CapCut-Style) === */}
+                                {currentTool === 'joiner' && (
+                                    <div className="space-y-6">
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-2">
+                                            <Music className="w-3 h-3" /> Audio Tracks
+                                        </h3>
+
+                                        {/* Track List — side by side */}
+                                        {joinerTracks.length > 0 ? (
+                                            <div className="flex flex-wrap gap-4">
+                                                {joinerTracks.map((track, idx) => (
+                                                    <motion.div
+                                                        key={track.id}
+                                                        layout
+                                                        initial={{ opacity: 0, scale: 0.9 }}
+                                                        animate={{ opacity: 1, scale: 1 }}
+                                                        className={`flex-1 min-w-[200px] max-w-[300px] p-6 rounded-3xl border transition-all ${joinerPlayingId === track.id ? 'bg-purple-500/10 border-purple-500/40 shadow-lg shadow-purple-500/10' : 'bg-zinc-900/50 border-white/5'}`}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">Track {idx + 1}</span>
+                                                            <button onClick={() => removeJoinerTrack(track.id)} className="p-1 text-zinc-600 hover:text-red-400 transition-colors">
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-xs font-bold truncate mb-3 text-white/80">{track.name}</p>
+                                                        <p className="text-[9px] text-zinc-600 font-bold mb-4">{formatTime(track.duration)}</p>
+
+                                                        <audio
+                                                            ref={el => { joinerAudioRefs.current[track.id] = el; }}
+                                                            src={track.url}
+                                                            onEnded={() => handleJoinerTrackEnd(track.id)}
+                                                            className="hidden"
+                                                        />
+
+                                                        <button
+                                                            onClick={() => toggleJoinerTrackPlay(track.id)}
+                                                            className={`w-full h-10 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${joinerPlayingId === track.id ? 'bg-purple-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}
+                                                        >
+                                                            {joinerPlayingId === track.id ? <><Pause className="w-3 h-3" /> Playing</> : <><Play className="w-3 h-3 ml-0.5" /> Preview</>}
+                                                        </button>
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="h-40 border-2 border-dashed border-zinc-900 rounded-3xl flex flex-col items-center justify-center gap-4 text-zinc-700">
+                                                <Plus className="w-10 h-10" />
+                                                <p className="text-xs font-black uppercase tracking-widest">Add audio files to start</p>
+                                            </div>
+                                        )}
+
+                                        {/* Add + Preview Buttons */}
+                                        <div className="flex gap-4">
+                                            <label className="flex-1 h-14 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center gap-3 text-purple-400 font-black text-xs uppercase tracking-widest cursor-pointer hover:bg-purple-500/20 transition-all">
+                                                <input type="file" multiple onChange={handleJoinerAdd} className="hidden" accept="audio/*" />
+                                                <Plus className="w-5 h-5" /> Add Audios
+                                            </label>
+
+                                            {joinerTracks.length >= 2 && (
+                                                <button
+                                                    onClick={playJoinerPreview}
+                                                    className={`h-14 px-8 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${joinerPreviewPlaying ? 'bg-white text-black' : 'bg-zinc-800 border border-white/5 text-zinc-400 hover:bg-zinc-700'}`}
+                                                >
+                                                    {joinerPreviewPlaying ? <><Pause className="w-4 h-4" /> Stop</> : <><Play className="w-4 h-4" /> Live Preview</>}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ACTION BUTTON — not for trimmer/joiner which have it inline */}
+                                <div className="space-y-4">
+                                    <button
+                                        onClick={runEngine}
+                                        disabled={processing || !canRun}
+                                        className="group relative w-full py-5 bg-white text-black rounded-2xl overflow-hidden font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-zinc-200 disabled:opacity-20 active:scale-95"
+                                    >
+                                        <div className="relative z-10 flex items-center justify-center gap-3">
+                                            {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
+                                            {processing ? 'Processing...' : actionButtonLabel}
+                                        </div>
+                                    </button>
+
+                                    {profile?.subscription_tier === 'free' && (
+                                        <div className="flex flex-col gap-3 mt-4 px-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Zap className="w-3 h-3 text-purple-400" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                                                        {profile?.free_credits || 0} Silver Credits
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={handleEarnCredits}
+                                                    className="text-[10px] font-black uppercase tracking-widest text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                                                >
+                                                    <Sparkles className="w-3 h-3 animate-pulse" />
+                                                    Earn More
+                                                </button>
+                                            </div>
+                                            <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest">
+                                                {profile?.free_credits > 0 ? "Skip the next ad gate by using 1 Silver credit." : "Watch an ad to unlock this action."}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Progress Visualizer */}
+                                <AnimatePresence>
+                                    {processing && (
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            className="absolute inset-0 bg-black/95 backdrop-blur-xl z-50 flex flex-col items-center justify-center"
+                                        >
+                                            <div className="w-80 h-1.5 bg-zinc-900 rounded-full overflow-hidden mb-8 border border-white/5">
+                                                <motion.div
+                                                    className="h-full bg-gradient-to-r from-purple-500 to-blue-500 shadow-[0_0_20px_rgba(168,85,247,0.6)]"
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${progress}%` }}
+                                                />
+                                            </div>
+                                            <h2 className="text-7xl font-black tracking-tighter mb-4 italic">{progress}%</h2>
+                                            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-purple-400 animate-pulse">Processing your media...</p>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         </div>
-                        <p className="text-white/30 text-lg leading-relaxed max-w-2xl">{actions.find(a => a.id === action)?.desc}</p>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                        <label className="text-xs font-black uppercase tracking-widest text-white/20 ml-4 mb-2">
-                            {action === 'trim-audio' ? 'Audio Link or Upload File' :
-                                action === 'extract-audio' ? 'Video Link or Upload File' : 'Video Link'}
-                        </label>
-                        <div className="flex flex-col md:flex-row gap-4">
-                            {action === 'merge-audio' ? (
-                                <div className="flex-grow flex flex-col gap-6">
-                                    {/* Track List */}
-                                    <div className="flex flex-col gap-3">
-                                        {tracks.map((track, idx) => (
-                                            <motion.div
-                                                layout
-                                                key={track.id}
-                                                className={`flex items-center gap-4 p-4 border rounded-2xl transition-all duration-500 ${previewIndex === idx ? 'bg-blue-500/10 border-blue-500/40 shadow-lg shadow-blue-500/10 scale-[1.02]' : 'bg-white/[0.03] border-white/10'}`}
-                                            >
-                                                <div className="flex flex-col bg-white/5 rounded-lg overflow-hidden border border-white/5">
-                                                    <button
-                                                        onClick={() => moveTrack(idx, 'up')}
-                                                        className="p-2 text-white/20 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-0"
-                                                        disabled={idx === 0}
-                                                        title="Move Up"
-                                                    >
-                                                        <GripVertical className="w-4 h-4 rotate-180" />
-                                                    </button>
-                                                    <div className="h-[1px] w-full bg-white/5" />
-                                                    <button
-                                                        onClick={() => moveTrack(idx, 'down')}
-                                                        className="p-2 text-white/20 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-0"
-                                                        disabled={idx === tracks.length - 1}
-                                                        title="Move Down"
-                                                    >
-                                                        <GripVertical className="w-4 h-4" />
-                                                    </button>
-                                                </div>
+                    {/* Right Panel: Output & Live Preview */}
+                    <div className="xl:col-span-4 space-y-6">
+                        <section className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8 space-y-6">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Live Workspace</h3>
 
-                                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${previewIndex === idx ? 'bg-blue-500 text-white animate-pulse' : 'bg-blue-500/10 text-blue-400'}`}>
-                                                    {previewIndex === idx ? <Volume2 className="w-5 h-5" /> : <Music className="w-5 h-5" />}
-                                                </div>
+                            <AnimatePresence mode="wait">
+                                {outputUrl ? (
+                                    <motion.div
+                                        key="result"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="space-y-6"
+                                    >
+                                        {/* Video Preview */}
+                                        {(currentTool === 'video-extractor' || currentTool === 'magic-sync') && (
+                                            <div className="aspect-video bg-black rounded-3xl overflow-hidden border border-white/10 flex items-center justify-center relative group">
+                                                <video src={outputUrl} controls className="w-full h-full object-contain" />
+                                            </div>
+                                        )}
 
-                                                <div className="flex flex-col flex-grow min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-black text-blue-500 opacity-40">Track {idx + 1}</span>
-                                                        <span className="text-white font-bold text-sm truncate">{track.name}</span>
+                                        {/* Audio Preview — for audio tools AND magic-sync */}
+                                        {(currentTool === 'audio-extractor' || currentTool === 'trimmer' || currentTool === 'joiner') && (
+                                            <div className="p-6 bg-zinc-900/60 border border-white/5 rounded-3xl space-y-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                                                        <Music className="w-5 h-5 text-purple-400" />
                                                     </div>
-                                                    <audio
-                                                        ref={el => { trackRefs.current[track.id] = el }}
-                                                        src={track.url}
-                                                        onEnded={() => handleTrackEnd(idx)}
-                                                        className="h-6 w-full opacity-40 hover:opacity-100 transition-opacity mt-2"
-                                                        controls
-                                                    />
+                                                    <span className="text-xs font-black uppercase tracking-widest text-zinc-500">Audio Preview</span>
                                                 </div>
+                                                <audio src={outputUrl} controls className="w-full" />
+                                            </div>
+                                        )}
 
-                                                <button
-                                                    onClick={() => handleTrackRemove(track.id, track.url)}
-                                                    className="p-3 text-white/20 hover:text-red-400 transition-colors"
+                                        {/* Magic Sync — show both video + audio */}
+                                        {currentTool === 'magic-sync' && outputAudioUrl && (
+                                            <div className="p-6 bg-zinc-900/60 border border-white/5 rounded-3xl space-y-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                                                        <Music className="w-5 h-5 text-purple-400" />
+                                                    </div>
+                                                    <span className="text-xs font-black uppercase tracking-widest text-zinc-500">Audio Preview</span>
+                                                </div>
+                                                <audio src={outputAudioUrl} controls className="w-full" />
+                                            </div>
+                                        )}
+
+                                        {/* Download Buttons */}
+                                        <div className="grid grid-cols-1 gap-3">
+                                            <a
+                                                href={outputUrl}
+                                                download={`lab-${currentTool}-${Date.now()}`}
+                                                className="w-full py-5 bg-green-500 hover:bg-green-400 text-black text-center rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-green-900/20 flex items-center justify-center gap-2"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                {currentTool === 'magic-sync' ? 'Download Video' : 'Download Output'}
+                                            </a>
+
+                                            {currentTool === 'magic-sync' && outputAudioUrl && (
+                                                <a
+                                                    href={outputAudioUrl}
+                                                    download={`lab-audio-${Date.now()}`}
+                                                    className="w-full py-5 bg-purple-500 hover:bg-purple-400 text-white text-center rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-purple-900/20 flex items-center justify-center gap-2"
                                                 >
-                                                    <Trash className="w-5 h-5" />
-                                                </button>
-                                            </motion.div>
-                                        ))}
+                                                    <Download className="w-4 h-4" />
+                                                    Download Audio
+                                                </a>
+                                            )}
 
-                                        {tracks.length === 0 && (
-                                            <div className="h-40 border-2 border-dashed border-white/5 rounded-[2rem] flex flex-col items-center justify-center gap-4 text-white/20">
-                                                <Upload className="w-10 h-10" />
-                                                <p className="text-sm font-bold uppercase tracking-[0.2em]">Add first track to start</p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex flex-col md:flex-row gap-4">
-                                        <input
-                                            type="file"
-                                            ref={multiFileInputRef}
-                                            onChange={handleTrackAdd}
-                                            multiple
-                                            hidden
-                                            accept="audio/*"
-                                        />
-                                        <button
-                                            onClick={() => multiFileInputRef.current?.click()}
-                                            className="h-20 flex-grow bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center gap-4 text-blue-400 font-black uppercase tracking-widest text-sm hover:bg-blue-500/20 transition-all"
-                                        >
-                                            <Plus className="w-6 h-6" /> Add Audios
-                                        </button>
-
-                                        {tracks.length > 1 && (
                                             <button
-                                                onClick={togglePlayAll}
-                                                className={`h-20 px-10 rounded-2xl border transition-all flex items-center gap-4 font-black uppercase tracking-widest text-sm ${isPlayingAll ? 'bg-white text-black border-white' : 'bg-white/5 text-white border-white/10 hover:bg-white/10'}`}
+                                                onClick={() => { setOutputUrl(null); setOutputAudioUrl(null); }}
+                                                className="w-full py-5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
                                             >
-                                                {isPlayingAll ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                                                {isPlayingAll ? 'Mute Preview' : 'Mix Preview'}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex-grow flex flex-col md:flex-row gap-4">
-                                    {!file ? (
-                                        <input
-                                            type="text"
-                                            value={url}
-                                            onChange={(e) => setUrl(e.target.value)}
-                                            placeholder={
-                                                action === 'trim-audio' ? "Paste Audio URL or select file..." :
-                                                    action === 'download-video' ? "Paste Video URL (YouTube, TikTok, etc)..." :
-                                                        "Paste video link here..."
-                                            }
-                                            className="flex-grow h-20 bg-white/[0.03] border border-white/10 rounded-2xl px-10 text-white font-medium placeholder:text-white/10 focus:outline-none focus:border-blue-500/50 focus:bg-blue-500/[0.02] transition-all text-lg shadow-inner ring-1 ring-white/5"
-                                        />
-                                    ) : (
-                                        <div className="flex-grow h-20 bg-blue-500/10 border border-blue-500/40 rounded-2xl px-8 flex items-center justify-between shadow-inner ring-1 ring-blue-500/20">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-10 w-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400">
-                                                    <FileAudio className="w-5 h-5" />
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-white font-bold text-sm truncate max-w-[200px]">{file.name}</span>
-                                                    <span className="text-white/30 text-[10px] uppercase font-black tracking-widest">Ready to process</span>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => setFile(null)}
-                                                className="text-white/20 hover:text-red-400 transition-colors p-2"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
+                                                Start Over
                                             </button>
                                         </div>
-                                    )}
-
-                                    {action !== 'magic-extract' && action !== 'download-video' && !file && (
-                                        <>
-                                            <input
-                                                type="file"
-                                                ref={fileInputRef}
-                                                onChange={handleFileSelect}
-                                                hidden
-                                                accept="video/*,audio/*"
-                                            />
-                                            <button
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="h-20 w-20 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white/40 hover:bg-white/10 hover:text-white transition-all group shrink-0"
-                                                title="Upload Local File"
-                                            >
-                                                <Upload className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-
-                            <button
-                                disabled={(!url && !file && tracks.length === 0) || loading}
-                                onClick={handleAction}
-                                className={`h-20 px-12 rounded-2xl font-black text-lg uppercase tracking-widest flex items-center justify-center gap-4 transition-all active:scale-95 shadow-22 shadow-blue-900/20 ${((!url && !file && tracks.length === 0) || loading) ? 'bg-white/5 text-white/20 cursor-not-allowed grayscale' : 'bg-white text-black hover:-translate-y-1 hover:shadow-white/10 active:translate-y-0 group overflow-hidden'}`}
-                            >
-                                {loading ? (
-                                    'Processing...'
+                                    </motion.div>
                                 ) : (
-                                    <>
-                                        Run Engine <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
-                                    </>
+                                    <motion.div
+                                        key="placeholder"
+                                        className="aspect-square lg:aspect-video bg-zinc-900/50 border-2 border-dashed border-white/5 rounded-3xl flex flex-col items-center justify-center text-zinc-700 p-8 text-center"
+                                    >
+                                        <div className="p-4 bg-zinc-800 rounded-2xl mb-4">
+                                            <Play className="w-6 h-6 opacity-30 fill-current" />
+                                        </div>
+                                        <p className="text-[10px] uppercase font-black tracking-widest">Awaiting Input</p>
+                                        <p className="text-[9px] mt-2 leading-relaxed max-w-[200px] font-bold">Process a link or file to see the preview here.</p>
+                                    </motion.div>
                                 )}
-                            </button>
-                        </div>
-
-                        {action === 'trim-audio' && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                className="flex flex-col gap-10 p-10 bg-blue-500/[0.03] border border-blue-500/20 rounded-[2.5rem]"
-                            >
-                                {file && filePreviewUrl && (
-                                    <div className="flex flex-col gap-6">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Listen & Adjust</span>
-                                                <p className="text-white/60 text-xs font-medium">Use the player or the slider to find your cut point.</p>
-                                            </div>
-                                            <div className="px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-[10px] font-black uppercase tracking-widest leading-none">
-                                                {Math.floor(startTime)}s / {Math.floor(totalDuration)}s
-                                            </div>
-                                        </div>
-
-                                        <audio
-                                            ref={audioRef}
-                                            src={filePreviewUrl}
-                                            onLoadedMetadata={(e) => setTotalDuration(e.currentTarget.duration)}
-                                            onTimeUpdate={(e) => setStartTime(e.currentTarget.currentTime)}
-                                            controls
-                                            className="w-full h-12 rounded-xl"
-                                        />
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                    <div className="flex flex-col gap-6">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex justify-between items-center mb-2 px-1">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-blue-400">Where to start?</label>
-                                                <span className="text-white/40 text-[10px] font-bold">{Math.floor(startTime)} Seconds</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max={totalDuration || 100}
-                                                step="1"
-                                                value={startTime}
-                                                onChange={(e) => handleSeek(Number(e.target.value))}
-                                                className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                                            />
-                                            {/* Precise input for those who want it */}
-                                            <div className="mt-4">
-                                                <input
-                                                    type="number"
-                                                    value={Math.floor(startTime)}
-                                                    onChange={(e) => handleSeek(Number(e.target.value))}
-                                                    className="w-24 h-12 bg-white/[0.03] border border-white/10 rounded-xl px-4 text-white font-bold text-sm focus:outline-none focus:border-blue-500/50"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col gap-6">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex justify-between items-center mb-2 px-1">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-blue-400">How many seconds?</label>
-                                                <span className="text-white/40 text-[10px] font-bold">{duration} Seconds long</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min="1"
-                                                max={totalDuration ? totalDuration - startTime : 60}
-                                                step="1"
-                                                value={duration}
-                                                onChange={(e) => setDuration(Number(e.target.value))}
-                                                className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                                            />
-                                            <div className="mt-4">
-                                                <input
-                                                    type="number"
-                                                    value={duration}
-                                                    onChange={(e) => setDuration(Number(e.target.value))}
-                                                    className="w-24 h-12 bg-white/[0.03] border border-white/10 rounded-xl px-4 text-white font-bold text-sm focus:outline-none focus:border-blue-500/50"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center gap-3">
-                                    <AlertCircle className="w-4 h-4 text-white/20" />
-                                    <p className="text-[10px] text-white/30 font-medium">Dragging the "Where to start" slider will also move the audio player so you can listen as you pick.</p>
-                                </div>
-                            </motion.div>
-                        )}
+                            </AnimatePresence>
+                        </section>
                     </div>
                 </div>
 
-                {/* Dynamic Background */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] rounded-full -mr-32 -mt-32 pointer-events-none" />
-            </div>
-
-            {/* Result Section */}
-            <AnimatePresence>
-                {loading && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="p-16 border-2 border-dashed border-blue-500/10 rounded-[3rem] flex flex-col items-center justify-center gap-10 text-center bg-blue-500/[0.01]"
-                    >
-                        <div className="flex gap-2">
-                            <motion.div className="w-3 h-3 rounded-full bg-blue-500" animate={{ y: [0, -10, 0] }} transition={{ duration: 1, repeat: Infinity }} />
-                            <motion.div className="w-3 h-3 rounded-full bg-blue-500/70" animate={{ y: [0, -10, 0] }} transition={{ duration: 1, repeat: Infinity, delay: 0.2 }} />
-                            <motion.div className="w-3 h-3 rounded-full bg-blue-500/40" animate={{ y: [0, -10, 0] }} transition={{ duration: 1, repeat: Infinity, delay: 0.4 }} />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <h4 className="text-2xl font-bold tracking-tight">Studio Engine Running...</h4>
-                            <p className="text-white/25 max-w-md mx-auto leading-relaxed">Please don't refresh. We are communicating with local FFmpeg nodes to process your requests.</p>
-                        </div>
-                    </motion.div>
-                )}
-
-                {result && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col gap-8 p-12 bg-white/[0.03] border border-white/10 rounded-[3rem] shadow-2xl overflow-hidden relative"
-                    >
-                        <header className="flex items-center gap-6">
-                            <div className="h-16 w-16 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400">
-                                <CheckCircle2 className="w-8 h-8" />
-                            </div>
-                            <div>
-                                <h4 className="text-3xl font-bold tracking-tight italic uppercase">Processing Complete</h4>
-                                <p className="text-white/30 text-sm font-medium">Exporting output to local downloads...</p>
-                            </div>
-                        </header>
-
-                        {/* Media Preview */}
-                        <div className="relative z-10 w-full">
-                            {(result.videoUrl || (result.url && result.type === 'video')) && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="w-full aspect-video bg-black/60 rounded-[2rem] overflow-hidden border border-white/10 shadow-inner group relative"
-                                >
-                                    <video
-                                        src={result.videoUrl || result.url}
-                                        controls
-                                        className="w-full h-full object-contain"
-                                    />
-                                </motion.div>
-                            )}
-                            {(result.audioUrl || (result.url && result.type === 'audio')) && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="w-full p-8 bg-white/[0.03] border border-white/10 rounded-3xl mt-4"
-                                >
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <Music className="w-5 h-5 text-blue-400" />
-                                        <span className="text-xs font-black uppercase tracking-widest text-white/40">Audio Preview</span>
-                                    </div>
-                                    <audio
-                                        src={result.audioUrl || result.url}
-                                        controls
-                                        className="w-full custom-audio-player"
-                                    />
-                                </motion.div>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 relative z-10">
-                            {(result.url || result.videoUrl) && (
-                                <div className="p-8 bg-black/40 border border-white/5 rounded-3xl flex flex-col gap-6">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Standard Export</span>
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-bold text-lg">{(result.videoUrl || result.type === 'video') ? 'Video MP4' : 'Audio MP3'}</span>
-                                        <a
-                                            href={result.videoUrl || result.url}
-                                            download
-                                            className="bg-white text-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
-                                        >
-                                            Download
-                                            <Download className="w-3.5 h-3.5 fill-black" />
-                                        </a>
-                                    </div>
-                                </div>
-                            )}
-                            {result.audioUrl && (
-                                <div className="p-8 bg-blue-500/5 border border-blue-500/20 rounded-3xl flex flex-col gap-6 ring-1 ring-blue-500/10">
-                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400">Audio Magic Track</span>
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-bold text-lg">MP3 Track</span>
-                                        <a
-                                            href={result.audioUrl}
-                                            download
-                                            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
-                                        >
-                                            Download
-                                            <Download className="w-3.5 h-3.5 fill-white" />
-                                        </a>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Animated Waves Decor */}
-                        <div className="absolute -bottom-10 right-0 w-full h-1/2 bg-blue-600/5 blur-[100px] pointer-events-none" />
-                    </motion.div>
-                )}
-
+                {/* Error Toast */}
                 {error && (
                     <motion.div
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="p-8 bg-red-500/5 border border-red-500/10 rounded-3xl flex items-center gap-4 text-red-100/40 text-sm font-medium"
+                        className="fixed bottom-10 left-1/2 -translate-x-1/2 p-5 bg-red-500/10 border border-red-500/30 rounded-3xl backdrop-blur-2xl flex items-center gap-4 text-red-400 z-[100] shadow-2xl"
                     >
-                        <div className="h-10 w-10 bg-red-500/20 rounded-xl flex items-center justify-center text-red-400 shrink-0">
-                            <AlertCircle className="w-5 h-5" />
-                        </div>
-                        {error}
+                        <AlertCircle className="w-6 h-6" />
+                        <span className="text-xs font-black uppercase tracking-widest">{error}</span>
+                        <button onClick={() => setError(null)} className="ml-4 p-2 hover:bg-white/5 rounded-lg"><Plus className="w-4 h-4 rotate-45" /></button>
                     </motion.div>
                 )}
-            </AnimatePresence>
+            </div>
+
+            <style jsx global>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #27272a;
+                    border-radius: 10px;
+                }
+                audio::-webkit-media-controls-enclosure {
+                    background-color: transparent !important;
+                }
+                ::-webkit-scrollbar {
+                  width: 6px;
+                }
+                ::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                ::-webkit-scrollbar-thumb {
+                  background: #222;
+                  border-radius: 20px;
+                }
+            `}</style>
+            {/* Ad Integration */}
+            <AdGate
+                isOpen={showAd}
+                onClose={() => setShowAd(false)}
+                onComplete={() => {
+                    const canRunNow = canRun;
+                    if (canRunNow) {
+                        executeEngine();
+                    } else {
+                        awardCredit();
+                    }
+                }}
+            />
         </div>
     );
 }

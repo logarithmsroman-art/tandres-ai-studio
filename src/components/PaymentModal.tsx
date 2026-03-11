@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CreditCard, Zap, Check, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react';
+import { X, CreditCard, Zap, Check, ShieldCheck, Loader2, Music } from 'lucide-react';
 import { PaystackButton } from 'react-paystack';
 import Logo from '@/components/Logo';
 
@@ -12,48 +12,131 @@ interface PaymentModalProps {
     userEmail: string;
     userId: string;
     onSuccess: () => void;
+    currentTier?: string;
 }
 
-const PACKAGES = [
+const CREDIT_PACKS = [
     {
         id: 'pack-10',
         credits: 10,
         price: 1500,
-        label: 'Starter Pack',
-        desc: 'Ideal for quick projects. Includes full access to all Video Studio tools.',
-        icon: <Zap className="w-5 h-5 text-purple-400" />
+        label: 'Starter Gold',
+        description: 'Elite cloning entry.',
+        features: [
+            '10 Gold Credits',
+            'Essential AI',
+            'Permanent Storage',
+            'No Expiry',
+            '24/7 Support'
+        ],
+        icon: <Zap className="w-6 h-6 text-purple-400" />,
+        type: 'credit',
+        color: 'from-purple-500/20 to-transparent'
     },
     {
         id: 'pack-20',
         credits: 20,
         price: 3000,
-        label: 'Creator Pack',
-        desc: 'Most popular. High-priority voice generation and faster processing.',
-        icon: <Zap className="w-5 h-5 text-indigo-400" />,
-        popular: true
+        label: 'Creator Gold',
+        description: 'Content creator balance.',
+        features: [
+            '20 Gold Credits',
+            'High-Priority',
+            'Studio Accuracy',
+            'Permanent Storage',
+            'Commercial Rights'
+        ],
+        icon: <Zap className="w-6 h-6 text-indigo-400" />,
+        popular: true,
+        type: 'credit',
+        color: 'from-indigo-500/20 to-transparent'
     },
     {
         id: 'pack-50',
         credits: 50,
         price: 7500,
-        label: 'Studio Pack',
-        desc: 'Built for agencies. Generate professional assets for multiple clients.',
-        icon: <Zap className="w-5 h-5 text-blue-400" />
+        label: 'Studio Gold',
+        description: 'High-volume studio work.',
+        features: [
+            '50 Gold Credits',
+            'Ultra-Priority',
+            'Agency Rights',
+            'Advanced Modulation',
+            'White-Label'
+        ],
+        icon: <Zap className="w-6 h-6 text-blue-400" />,
+        type: 'credit',
+        color: 'from-blue-500/20 to-transparent'
     },
     {
-        id: 'pack-monthly',
+        id: 'pack-elite',
         credits: 150,
         price: 15000,
-        label: 'Monthly Pro',
-        desc: 'Our best value bundle. 150 credits for heavy-duty content production.',
-        sub: true,
-        icon: <Zap className="w-5 h-5 text-white" />
+        label: 'Elite Gold',
+        description: 'Agency power pack.',
+        features: [
+            '150 Gold Credits',
+            'Zero Limits',
+            'Fastest Speed',
+            'One-Time Buy',
+            'Dedicated Pipe'
+        ],
+        icon: <Zap className="w-6 h-6 text-yellow-400" />,
+        type: 'credit',
+        color: 'from-yellow-500/20 to-transparent'
     }
 ];
 
-export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuccess }: PaymentModalProps) {
-    const [selectedPack, setSelectedPack] = useState(PACKAGES[1]);
+const LAB_SUBSCRIPTIONS = [
+    {
+        id: 'plan-starter',
+        months: 1,
+        price: 3000,
+        label: 'Starter Lab',
+        description: 'Individual video studio.',
+        features: [
+            '1 Month Ad-Free',
+            'Unlimited YT/IG',
+            '200 TikTok Extracts',
+            '15min Std Duration',
+            '5min TikTok Limit'
+        ],
+        icon: <Music className="w-6 h-6 text-pink-400" />,
+        type: 'subscription',
+        planName: 'starter',
+        color: 'from-pink-500/20 to-transparent'
+    },
+    {
+        id: 'plan-pro',
+        months: 2,
+        price: 15000,
+        label: 'Pro Studio',
+        description: 'Elite production suite.',
+        features: [
+            '2 Months Ad-Free',
+            'Unlimited YT/IG',
+            '500 TikTok Extracts',
+            '15hr Std Duration',
+            '10min TikTok Limit'
+        ],
+        icon: <Music className="w-6 h-6 text-yellow-400" />,
+        popular: true,
+        type: 'subscription',
+        planName: 'pro',
+        color: 'from-yellow-500/20 to-transparent'
+    }
+];
+
+export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuccess, currentTier = 'free' }: PaymentModalProps) {
+    const [activeTab, setActiveTab] = useState<'credits' | 'subscriptions'>('credits');
+    const [selectedPack, setSelectedPack] = useState<any>(CREDIT_PACKS[1]);
     const [isVerifying, setIsVerifying] = useState(false);
+
+    const handleTabChange = (tab: 'credits' | 'subscriptions') => {
+        setActiveTab(tab);
+        if (tab === 'credits') setSelectedPack(CREDIT_PACKS[1]);
+        else setSelectedPack(LAB_SUBSCRIPTIONS[0]);
+    };
 
     // Generate a fresh reference every time the pack or modal changes
     const reference = useMemo(() => {
@@ -61,18 +144,17 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
     }, [selectedPack.id, isOpen]);
 
     const handlePaystackSuccessAction = async (response: any) => {
-        // Response format: { reference: "...", status: "success", trans: "..." }
-        alert('PAYMENT CAPTURED! Reference: ' + response.reference);
         setIsVerifying(true);
 
         try {
             const verificationBody = {
                 reference: response.reference,
                 userId: userId,
-                credits: selectedPack.credits
+                type: selectedPack.type,
+                credits: selectedPack.credits || 0,
+                planName: selectedPack.planName || null,
+                months: selectedPack.months || 0
             };
-
-            console.log('[paystack] Sending to verification:', verificationBody);
 
             const res = await fetch('/api/paystack-verify', {
                 method: 'POST',
@@ -81,12 +163,11 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
             });
 
             const data = await res.json();
-            console.log('[paystack] Backend response:', data);
 
             if (res.ok) {
                 onSuccess();
                 onClose();
-                alert(`SUCCESS! ${selectedPack.credits} credits added.`);
+                alert(`SUCCESS! Transaction complete.`);
             } else {
                 alert('Verification Error: ' + (data.error || 'Server rejected payment.'));
             }
@@ -115,11 +196,13 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
             ],
         },
         publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-        text: "Purchase Credits",
+        text: activeTab === 'credits' ? "Purchase Credits" : "Subscribe Now",
         onSuccess: (res: any) => handlePaystackSuccessAction(res),
         onClose: handlePaystackCloseAction,
         reference: reference
     };
+
+    const currentList = activeTab === 'credits' ? CREDIT_PACKS : LAB_SUBSCRIPTIONS;
 
     return (
         <AnimatePresence>
@@ -138,59 +221,96 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                             initial={{ opacity: 0, scale: 0.9, y: 30 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                            className="w-full max-w-3xl bg-[#0a0a0a] border border-white/10 rounded-[3.5rem] p-12 shadow-[0_0_100px_rgba(124,58,237,0.1)] relative overflow-hidden pointer-events-auto"
+                            className="w-full max-w-6xl bg-[#050505] border border-white/5 rounded-[4rem] p-8 lg:p-10 shadow-[0_0_120px_rgba(124,58,237,0.08)] relative overflow-hidden pointer-events-auto flex flex-col min-h-[70vh] max-h-[98vh]"
                         >
-                            <button onClick={onClose} className="absolute top-10 right-10 text-white/20 hover:text-white transition-colors z-30">
-                                <X className="w-6 h-6" />
+                            <button onClick={onClose} className="absolute top-12 right-12 text-white/10 hover:text-white transition-colors z-30 p-2 hover:bg-white/5 rounded-full">
+                                <X className="w-7 h-7" />
                             </button>
 
-                            <div className="relative z-10 flex flex-col h-full">
-                                <header className="mb-12 text-center">
-                                    <div className="flex justify-center mb-6">
-                                        <Logo size="lg" glow={false} />
+                            <div className="relative z-10 flex flex-col h-full overflow-hidden">
+                                <header className="text-center shrink-0 mb-4">
+                                    <div className="flex justify-center mb-4">
+                                        <Logo size="md" glow={false} />
                                     </div>
-                                    <span className="text-purple-400 text-[10px] font-black uppercase tracking-[0.4em] mb-4 block">Secure Checkout</span>
-                                    <h2 className="text-4xl font-bold tracking-tight mb-3">Upgrade Your Studio</h2>
-                                    <p className="text-white/40 text-sm max-w-md mx-auto">Choose a plan to instantly add credits to your account. All payments are secured by Paystack.</p>
+                                    <span className="text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-2 block">Secure Checkout</span>
+                                    <h2 className="text-2xl font-black tracking-tight mb-2">Upgrade Your Studio</h2>
+
+                                    {/* Tabs */}
+                                    <div className="flex bg-white/[0.03] p-1 rounded-2xl mx-auto w-max mb-6 border border-white/5">
+                                        <button
+                                            onClick={() => handleTabChange('credits')}
+                                            className={`px-8 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all duration-500 ${activeTab === 'credits' ? 'bg-white text-black shadow-[0_10px_30px_rgba(255,255,255,0.2)]' : 'text-white/30 hover:text-white'}`}
+                                        >
+                                            Gold Credits
+                                        </button>
+                                        <button
+                                            onClick={() => handleTabChange('subscriptions')}
+                                            className={`px-8 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all duration-500 ${activeTab === 'subscriptions' ? 'bg-blue-600 text-white shadow-[0_10px_30px_rgba(37,99,235,0.3)]' : 'text-white/30 hover:text-white'}`}
+                                        >
+                                            Lab Subscriptions
+                                        </button>
+                                    </div>
                                 </header>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10 overflow-y-auto max-h-[40vh] pr-2 custom-scrollbar">
-                                    {PACKAGES.map((pkg) => (
+                                <div className={`grid gap-4 mb-6 flex-grow overflow-y-auto px-2 py-4 custom-scrollbar ${activeTab === 'credits' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto w-full'}`}>
+                                    {currentList.map((pkg) => (
                                         <button
                                             key={pkg.id}
                                             onClick={() => setSelectedPack(pkg)}
-                                            className={`relative p-8 rounded-[2rem] border text-left transition-all group overflow-hidden flex flex-col justify-between min-h-[160px] ${selectedPack.id === pkg.id ? 'bg-purple-600/[0.08] border-purple-500 ring-1 ring-purple-500/20' : 'bg-white/[0.02] border-white/5 hover:border-white/10'}`}
+                                            className={`relative group flex flex-col rounded-[2rem] border transition-all duration-700 text-left h-full overflow-hidden ${selectedPack.id === pkg.id ? 'bg-white/[0.08] border-white/20 shadow-[0_20px_60px_rgba(0,0,0,0.5)] ring-1 ring-white/10 scale-[1.01]' : 'bg-white/[0.01] border-white/[0.05] hover:border-white/20 hover:bg-white/[0.03] opacity-80 hover:opacity-100'}`}
                                         >
+                                            {/* Top Accent Bar */}
+                                            <div className={`h-1 w-full bg-gradient-to-r ${pkg.color} absolute top-0 left-0 opacity-40 group-hover:opacity-100 transition-opacity`} />
+
                                             {pkg.popular && (
-                                                <div className="absolute top-0 right-0 bg-purple-600 text-[8px] font-black uppercase tracking-widest px-4 py-1.5 rounded-bl-2xl text-white shadow-lg">Popular</div>
+                                                <div className="absolute top-4 right-6 px-3 py-1 bg-white text-black text-[8px] font-black uppercase tracking-widest rounded-full shadow-2xl z-20">Premium</div>
                                             )}
 
-                                            <div>
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${selectedPack.id === pkg.id ? 'bg-purple-600 text-white shadow-xl shadow-purple-900/40' : 'bg-white/5 text-white/40'}`}>
+                                            <div className="p-4 flex flex-col h-full relative z-10">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 bg-white/[0.05] shadow-2xl group-hover:scale-110 transition-transform duration-700`}>
                                                         {pkg.icon}
                                                     </div>
-                                                    {selectedPack.id === pkg.id && <motion.div layoutId="check" className="h-6 w-6 bg-purple-500 rounded-full flex items-center justify-center text-white"><Check className="w-4 h-4" /></motion.div>}
+                                                    <div>
+                                                        <h3 className="text-[10px] font-black tracking-tight uppercase">{pkg.label}</h3>
+                                                        <p className="text-[6px] text-white/30 font-black uppercase tracking-widest leading-none">Asset</p>
+                                                    </div>
                                                 </div>
 
-                                                <h3 className="text-xl font-bold tracking-tight mb-2">{pkg.label}</h3>
-                                                <p className="text-[11px] text-white/30 leading-relaxed mb-6 font-medium">{pkg.desc}</p>
-                                            </div>
+                                                <p className="text-[8px] text-white/50 font-medium mb-2 leading-tight italic opacity-80 group-hover:opacity-100 transition-opacity line-clamp-1">"{(pkg as any).description}"</p>
 
-                                            <div className="flex items-baseline gap-2 mt-auto">
-                                                <span className="text-white/20 text-xs font-black uppercase tracking-widest">₦</span>
-                                                <span className="text-3xl font-black tracking-tighter">{pkg.price.toLocaleString()}</span>
-                                                <div className="ml-auto flex flex-col items-end">
-                                                    <span className="text-white text-[10px] font-black uppercase tracking-widest">{pkg.credits} Credits</span>
-                                                    {pkg.sub && <span className="text-[8px] text-purple-400 font-bold uppercase tracking-widest italic">Billed Monthly</span>}
+                                                <div className="flex items-baseline gap-1 mb-2">
+                                                    <span className="text-white/20 text-[9px] font-black uppercase tracking-widest">₦</span>
+                                                    <span className="text-xl font-black tracking-tighter tabular-nums">{pkg.price.toLocaleString()}</span>
+                                                    {pkg.type === 'subscription' && <span className="text-white/30 text-[7px] font-black uppercase tracking-[0.2em] ml-1">/ mo</span>}
+                                                </div>
+
+                                                <div className="h-[1px] w-full bg-white/5 mb-3" />
+
+                                                <div className="space-y-1.5 mb-4 flex-grow">
+                                                    {pkg.features.map((feature: string, idx: number) => (
+                                                        <div key={idx} className="flex items-start gap-2 group/item">
+                                                            <div className={`w-3.5 h-3.5 rounded-md flex items-center justify-center shrink-0 border transition-all ${selectedPack.id === pkg.id ? 'bg-white border-transparent text-black' : 'bg-white/5 border-white/10 text-white/30 group-hover/item:border-white/20'}`}>
+                                                                <Check className="w-2 h-2" />
+                                                            </div>
+                                                            <span className={`text-[7.5px] font-black uppercase tracking-widest leading-[1.1] transition-colors ${selectedPack.id === pkg.id ? 'text-white/90' : 'text-zinc-500'}`}>{feature}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <div className={`mt-auto w-full h-9 rounded-lg border flex items-center justify-center transition-all duration-700 active:scale-95 ${selectedPack.id === pkg.id ? 'bg-white text-black border-transparent font-black uppercase tracking-[0.2em] text-[7.5px] shadow-[0_10px_20px_rgba(255,255,255,0.1)]' : 'bg-transparent border-white/10 text-white/30 text-[7px] font-black uppercase tracking-widest hover:border-white/40 hover:text-white'}`}>
+                                                    {selectedPack.id === pkg.id ? 'Get Assets' : 'Select'}
                                                 </div>
                                             </div>
+
+                                            {/* Glow Overlay */}
+                                            <div className={`absolute -bottom-20 -right-20 w-40 h-40 rounded-full blur-[80px] pointer-events-none transition-opacity duration-1000 bg-gradient-to-br ${pkg.color} ${selectedPack.id === pkg.id ? 'opacity-20' : 'opacity-0'}`} />
                                         </button>
                                     ))}
                                 </div>
 
                                 {userId ? (
-                                    <div className="p-8 bg-white/[0.03] border border-white/5 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8 mt-auto ring-1 ring-white/5 shadow-2xl">
+                                    <div className="p-8 bg-white/[0.03] border border-white/5 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8 shrink-0 ring-1 ring-white/5 shadow-2xl mt-auto">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -215,7 +335,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="p-10 bg-red-500/5 border border-red-500/10 rounded-[2.5rem] text-center">
+                                    <div className="p-10 bg-red-500/5 border border-red-500/10 rounded-[2.5rem] text-center shrink-0 mt-auto">
                                         <p className="text-red-400 font-bold uppercase tracking-widest text-xs">Auth session required to process payment.</p>
                                     </div>
                                 )}
