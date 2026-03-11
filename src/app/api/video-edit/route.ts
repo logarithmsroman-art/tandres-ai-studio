@@ -314,7 +314,7 @@ export async function POST(req: Request) {
                 // If YouTube, use additional stealth to bypass "Sign in" error
                 if (isYouTube) {
                     stealthOptions.format = 'best'; // Simplify format selection for faster metadata fetch
-                    stealthOptions.geoByePass = true;
+                    stealthOptions.geoBypass = true;
                 }
 
                 const info: any = await youtubedl(url, stealthOptions);
