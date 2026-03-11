@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import youtubedl from 'youtube-dl-exec';
+import { create } from 'youtube-dl-exec';
 import ffmpeg from 'fluent-ffmpeg';
+
+// Set up yt-dlp binary path for Vercel/Railway/Local compatibility
+const ytdlpPath = path.join(process.cwd(), 'bin', 'yt-dlp');
+const youtubedl = create(ytdlpPath);
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 
