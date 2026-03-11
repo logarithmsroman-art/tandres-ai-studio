@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, Upload, Play, Download, Trash2, Cpu, AlertCircle, CheckCircle2, Music, Sparkles, Zap, ArrowLeft, Loader2 } from 'lucide-react';
 import AdGate from './AdGate';
 import { supabase } from '@/lib/supabase';
-import PaymentModal from './PaymentModal';
+import dynamic from 'next/dynamic';
+const PaymentModal = dynamic(() => import('./PaymentModal'), { ssr: false });
 
 const CHARACTER_LIMIT = 500;
 

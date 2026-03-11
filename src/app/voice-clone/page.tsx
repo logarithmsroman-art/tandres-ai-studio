@@ -4,9 +4,14 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import VoiceCloneTab from '@/components/VoiceCloneTab';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
+
+const VoiceCloneTab = dynamic(() => import('@/components/VoiceCloneTab'), {
+    ssr: false,
+    loading: () => <div className="h-96 flex items-center justify-center text-white/20 uppercase tracking-[0.5em] font-black text-xs animate-pulse">Initializing Studio...</div>
+});
 
 export default function VoiceClonePage() {
     const [user, setUser] = useState<User | null>(null);
