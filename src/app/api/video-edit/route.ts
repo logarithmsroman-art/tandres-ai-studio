@@ -125,11 +125,16 @@ export async function POST(req: NextRequest) {
                     if (!data.success) throw new Error(data.error || 'Resolution failed');
                     mediaInfo = data;
                 } else {
-                    mediaInfo = await youtubedl(url, {
+                    const ytDlpOptions: any = {
                         dumpSingleJson: true,
                         noWarnings: true,
                         addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
-                    });
+                    };
+                    const cookiesPath = path.join(process.cwd(), 'cookies.txt');
+                    if (fs.existsSync(cookiesPath)) {
+                        ytDlpOptions.cookies = cookiesPath;
+                    }
+                    mediaInfo = await youtubedl(url, ytDlpOptions);
                     mediaInfo = {
                         title: mediaInfo.title,
                         thumbnail: mediaInfo.thumbnail,
