@@ -29,42 +29,78 @@ export async function POST(req: Request) {
             console.log('[paystack-verify] Payment confirmed by Paystack. Processing reward...');
 
             if (type === 'subscription') {
-                // Determine tiktok allocation
-                const tiktokAdd = planName === 'pro' ? 500 : 200;
+                const tiktokAllotment = planName === 'pro' ? 500 : 200;
+                const durationDays = (months || 1) * 30;
 
-                // Fetch current profile to check existing expiry and tiktok balance
+                // Fetch current profile to check if a plan is already active
                 const { data: profile } = await supabase
                     .from('profiles')
-                    .select('plan_expires_at, tiktok_extractions_remaining')
+                    .select('plan_expires_at')
                     .eq('id', userId)
                     .single();
 
-                let currentExpiry = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : new Date();
-                if (currentExpiry < new Date()) currentExpiry = new Date(); // If expired, start from now
+                const now = new Date();
+                const currentExpiry = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : null;
+                const isPlanActive = currentExpiry && currentExpiry > now;
 
-                // Add x months to expiry
-                const newExpiry = new Date(currentExpiry);
-                newExpiry.setMonth(newExpiry.getMonth() + (months || 1));
+                if (isPlanActive) {
+                    // Plan is active, put the new one in the queue
+                    const { error: queueError } = await supabase
+                        .from('subscription_queue')
+                        .insert({
+                            user_id: userId,
+                            tier: planName,
+                            tiktok_allotment: tiktokAllotment,
+                            duration_days: durationDays,
+                            status: 'pending'
+                        });
 
-                const currentTiktok = profile?.tiktok_extractions_remaining || 0;
-                const newTiktok = currentTiktok + tiktokAdd;
+                    if (queueError) throw queueError;
+                    return NextResponse.json({ success: true, status: 'queued', plan: planName });
+                } else {
+                    // No active plan, start this one immediately
+                    const newExpiry = new Date();
+                    newExpiry.setDate(newExpiry.getDate() + durationDays);
 
-                const { error: upsertError } = await supabase
+                    const { error: updateError } = await supabase
+                        .from('profiles')
+                        .update({
+                            subscription_tier: planName,
+                            plan_started_at: new Date().toISOString(),
+                            plan_expires_at: newExpiry.toISOString(),
+                            tiktok_extractions_remaining: tiktokAllotment, // Initial refill
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', userId);
+
+                    if (updateError) throw updateError;
+                    return NextResponse.json({ success: true, status: 'activated', plan: planName, expires: newExpiry });
+                }
+
+            } else if (type === 'silver_credits') {
+                // Add 500 Silver Credits (₦3,000 Bridge Pack)
+                const { data: profile } = await supabase
                     .from('profiles')
-                    .upsert({
-                        id: userId,
-                        subscription_tier: planName,
-                        plan_started_at: new Date().toISOString(),
-                        plan_expires_at: newExpiry.toISOString(),
-                        tiktok_extractions_remaining: newTiktok,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
+                    .select('free_credits')
+                    .eq('id', userId)
+                    .single();
 
-                if (upsertError) throw upsertError;
-                return NextResponse.json({ success: true, plan: planName, expires: newExpiry });
+                const currentSilver = profile?.free_credits || 0;
+                const newSilver = currentSilver + (credits || 500);
+
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({
+                        free_credits: newSilver,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', userId);
+
+                if (updateError) throw updateError;
+                return NextResponse.json({ success: true, newSilver });
 
             } else {
-                // Type is 'credit' or legacy
+                // Type is 'credit' (Gold Credits)
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('credits')
@@ -74,15 +110,16 @@ export async function POST(req: Request) {
                 const currentCredits = profile?.credits || 0;
                 const newCredits = currentCredits + (credits || 0);
 
-                const { error: upsertError } = await supabase
+                const { error: updateError } = await supabase
                     .from('profiles')
-                    .upsert({
+                    .update({
                         id: userId,
                         credits: newCredits,
                         updated_at: new Date().toISOString()
-                    }, { onConflict: 'id' });
+                    })
+                    .eq('id', userId);
 
-                if (upsertError) throw upsertError;
+                if (updateError) throw updateError;
                 return NextResponse.json({ success: true, newCredits });
             }
         } else {

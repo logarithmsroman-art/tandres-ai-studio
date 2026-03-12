@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
         let uploadedFile: File | null = null;
 
         const contentType = req.headers.get('content-type') || '';
-        
+
         if (contentType.includes('multipart/form-data')) {
             const formData = await req.formData();
             action = formData.get('action') as string;
@@ -70,135 +70,51 @@ export async function POST(req: NextRequest) {
         }
 
         if (url && (action === 'extract-audio' || action === 'resolve-url')) {
-            let tier = 'free';
-            let userProfile: any = null;
-            let isTikTok = url.includes('tiktok.com');
-
-            if (userId) {
-                const { createClient } = require('@supabase/supabase-js');
-                const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-                const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
-                userProfile = data;
-                if (userProfile?.subscription_tier) tier = userProfile.subscription_tier;
-            }
-
-            if (isTikTok && userProfile && tier !== 'free' && action !== 'resolve-url') {
-                const { createClient } = require('@supabase/supabase-js');
-                const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-                await sb.from('profiles').update({
-                    tiktok_extractions_remaining: Math.max(0, userProfile.tiktok_extractions_remaining - 1)
-                }).eq('id', userId);
-            }
+            // Log access or handle metadata if needed
         }
 
-        if (action === 'extract-audio') {
-            if (!inputPath) return NextResponse.json({ error: 'Input file or URL required' }, { status: 400 });
-            const outFile = path.join(downloadsDir, `audio-${runId}.mp3`);
-            await new Promise((resolve, reject) => {
-                ffmpeg(inputPath!)
-                    .output(outFile)
-                    .noVideo()
-                    .audioCodec('libmp3lame')
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .run();
-            });
-            return NextResponse.json({
-                success: true,
-                url: `/downloads/audio-${runId}.mp3`,
-                type: 'audio'
-            });
-
-        } else if (action === 'trim-audio') {
-            if (!inputPath) return NextResponse.json({ error: 'Input required' }, { status: 400 });
-            const outFile = path.join(downloadsDir, `trimmed-${runId}.mp3`);
-            await new Promise((resolve, reject) => {
-                ffmpeg(inputPath!)
-                    .setStartTime(startTime)
-                    .setDuration(duration)
-                    .output(outFile)
-                    .audioCodec('libmp3lame')
-                    .on('end', resolve)
-                    .on('error', reject)
-                    .run();
-            });
-            return NextResponse.json({
-                success: true,
-                url: `/downloads/trimmed-${runId}.mp3`,
-                type: 'audio'
-            });
-
-        } else if (action === 'merge-audio') {
-            if (!fileUrls || fileUrls.length === 0) return NextResponse.json({ error: 'fileUrls array is required' }, { status: 400 });
-            const outFile = path.join(downloadsDir, `merged-${runId}.mp3`);
-            const command = ffmpeg();
-            for (const fileUrl of fileUrls) {
-                let p = fileUrl;
-                if (fileUrl.startsWith('/downloads')) {
-                    p = path.join(process.cwd(), 'public', fileUrl);
-                } else if (!fileUrl.startsWith('http')) {
-                    p = path.join(process.cwd(), 'public', fileUrl);
-                }
-                if (fs.existsSync(p)) {
-                    command.input(p);
-                }
-            }
-            await new Promise((resolve, reject) => {
-                command.on('end', resolve).on('error', reject).mergeToFile(outFile, downloadsDir);
-            });
-            return NextResponse.json({
-                success: true,
-                url: `/downloads/merged-${runId}.mp3`,
-                type: 'audio'
-            });
-
-        } else if (action === 'resolve-url') {
+        if (action === 'resolve-url') {
             if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
 
             const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
             const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
             const isLocal = process.env.NODE_ENV === 'development';
             let railwayUrl = process.env.RAILWAY_URL || '';
-            
-            // Safety Belt: Ensure Railway URL starts with https://
+
             if (railwayUrl && !railwayUrl.startsWith('http')) {
                 railwayUrl = `https://${railwayUrl}`;
             }
 
-            if (isTikTok) {
-                if (railwayUrl && !isLocal) {
-                    return NextResponse.json({
-                        success: true,
-                        title: 'TikTok Video',
-                        thumbnail: '',
-                        streamUrl: `${railwayUrl}/api/stream?url=${encodeURIComponent(url)}`,
-                    });
+            // 1. Get User Profile and Tier
+            let tier = 'free';
+            let tiktokUnits = 0;
+            if (userId) {
+                const { createClient } = require('@supabase/supabase-js');
+                const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+                const { data: profile } = await sb.from('profiles').select('*').eq('id', userId).single();
+                if (profile) {
+                    const now = new Date();
+                    const expiry = profile.plan_expires_at ? new Date(profile.plan_expires_at) : null;
+                    if (expiry && expiry > now) {
+                        tier = profile.subscription_tier || 'free';
+                    } else {
+                        tier = 'free'; // Explicitly set when plan is null or expired
+                    }
+                    tiktokUnits = profile.tiktok_extractions_remaining || 0;
                 }
-                const { mkdtemp } = await import('fs/promises');
-                const os = await import('os');
-                const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'tiktok-'));
-                const outputPath = path.join(tmpDir, 'video.mp4');
-                await youtubedl(url, {
-                    noWarnings: true,
-                    format: 'best[ext=mp4]/best',
-                    output: outputPath,
-                    addHeader: [
-                        'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-                        'Referer:https://www.tiktok.com/',
-                    ],
-                });
-                return NextResponse.json({
-                    success: true,
-                    title: 'TikTok Video',
-                    thumbnail: '',
-                    streamUrl: `/api/serve-media?file=${encodeURIComponent(outputPath)}`,
-                    isDownloaded: true,
-                });
             }
 
-            if (isYouTube && !isLocal && railwayUrl) {
-                try {
-                    // Zero Cost Logic for YouTube: Resolve via Railway, Stream via Cloudflare
+            // 2. Define Limits
+            const limits = {
+                free: { yt_ig: 1800, tiktok: 90 },
+                starter: { yt_ig: 3600, tiktok: 300 },
+                pro: { yt_ig: 7200, tiktok: 600 }
+            };
+            const userLimits = limits[tier as keyof typeof limits] || limits.free;
+
+            try {
+                let mediaInfo: any = null;
+                if (!isLocal && railwayUrl) {
                     const res = await fetch(`${railwayUrl}/resolve`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -206,107 +122,102 @@ export async function POST(req: NextRequest) {
                         signal: AbortSignal.timeout(15000)
                     });
                     const data = await res.json();
-                    if (data.success) {
-                        const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
-                        const makeProxyUrl = (targetUrl: string) => {
-                            if (!targetUrl) return '';
-                            return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-                        };
-
-                        return NextResponse.json({
-                            success: true,
-                            title: data.title,
-                            thumbnail: data.thumbnail,
-                            streamUrl: makeProxyUrl(data.rawUrl),
-                            formats: data.formats?.filter((f: any) => f.url).map((f: any) => ({
-                                url: makeProxyUrl(f.url),
-                                ext: f.ext,
-                                note: f.format_note || f.quality || 'Auto',
-                                acodec: f.acodec,
-                                vcodec: f.vcodec
-                            }))
-                        });
-                    } else if (data.error) {
-                        throw new Error(data.error);
-                    }
-                } catch (e: any) {
-                    console.error('[video-edit] Zero-cost YouTube failed:', e);
-                    return NextResponse.json({ error: `YouTube extraction failed: ${e.message}` }, { status: 502 });
-                }
-            }
-
-            // Default handler for Instagram and others (Instagram, Facebook, etc.)
-            let info: any = null;
-            
-            // PRODUCTION: Use Railway as detective (Fixes python3 error)
-            if (!isLocal && railwayUrl) {
-                try {
-                    const res = await fetch(`${railwayUrl}/resolve`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url }),
-                        signal: AbortSignal.timeout(12000) 
+                    if (!data.success) throw new Error(data.error || 'Resolution failed');
+                    mediaInfo = data;
+                } else {
+                    mediaInfo = await youtubedl(url, {
+                        dumpSingleJson: true,
+                        noWarnings: true,
+                        addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
                     });
-
-                    // Error Check: If Railway sends back HTML or a 404, stop here
-                    if (!res.ok) {
-                        const text = await res.text();
-                        throw new Error(`Railway server responded with status ${res.status}.`);
-                    }
-
-                    const data = await res.json();
-                    if (data.success) {
-                        info = {
-                            title: data.title,
-                            thumbnail: data.thumbnail,
-                            url: data.rawUrl,
-                            formats: data.formats
-                        };
-                    } else if (data.error) {
-                        throw new Error(`Railway Detective Error: ${data.error}`);
-                    }
-                } catch (e: any) {
-                    console.error('[video-edit] Railway detective failed:', e);
-                    return NextResponse.json({ error: `Connection to Railway failed. Please check if the Railway server is online. (${e.message})` }, { status: 502 });
+                    mediaInfo = {
+                        title: mediaInfo.title,
+                        thumbnail: mediaInfo.thumbnail,
+                        rawUrl: mediaInfo.url,
+                        duration: mediaInfo.duration,
+                        formats: mediaInfo.formats
+                    };
                 }
-            }
 
-            // LOCAL/FALLBACK: Only runs on your computer
-            if (!info && isLocal) {
-                info = await youtubedl(url, {
-                    dumpSingleJson: true,
-                    noWarnings: true,
-                    preferFreeFormats: true,
-                    addHeader: [
-                        'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-                        'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                        'Accept-Language:en-US,en;q=0.9',
-                        'Referer:https://www.instagram.com/'
-                    ]
+                const duration = Number(mediaInfo.duration) || 0;
+                if (duration <= 0) {
+                    return NextResponse.json({ error: "Could not determine video length. For security, extraction is restricted." }, { status: 400 });
+                }
+
+                let maxDuration = isTikTok ? userLimits.tiktok : userLimits.yt_ig;
+                const isPaid = tier !== 'free';
+                const isTikTokFallback = isTikTok && isPaid && tiktokUnits <= 0;
+
+                if (isTikTokFallback) maxDuration = 90;
+
+                if (duration > maxDuration) {
+                    const limitText = maxDuration >= 3600 
+                        ? `${maxDuration / 3600} ${maxDuration / 3600 === 1 ? 'hour' : 'hours'}` 
+                        : (maxDuration >= 60 ? `${maxDuration / 60} minutes` : `${maxDuration} seconds`);
+                    
+                    return NextResponse.json({
+                        error: `Video is too long (${Math.round(duration / 60)} minutes). Your current plan limit is ${limitText}.`,
+                        isDurationError: true,
+                        tier
+                    }, { status: 403 });
+                }
+
+                if (isTikTok && isPaid && tiktokUnits > 0 && !isTikTokFallback) {
+                    const { createClient } = require('@supabase/supabase-js');
+                    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+                    await sb.from('profiles').update({ tiktok_extractions_remaining: Math.max(0, tiktokUnits - 1) }).eq('id', userId);
+                }
+
+                const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
+                const makeProxyUrl = (targetUrl: string) => {
+                    if (!targetUrl) return '';
+                    if (isTikTok) return `${railwayUrl}/api/stream?url=${encodeURIComponent(targetUrl)}`;
+                    return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+                };
+
+                return NextResponse.json({
+                    success: true,
+                    title: mediaInfo.title,
+                    thumbnail: mediaInfo.thumbnail,
+                    streamUrl: makeProxyUrl(mediaInfo.rawUrl),
+                    duration: mediaInfo.duration,
+                    isTikTokFallback,
+                    formats: mediaInfo.formats?.filter((f: any) => f.url).map((f: any) => ({
+                        url: makeProxyUrl(f.url),
+                        ext: f.ext,
+                        note: f.format_note || f.quality || 'Auto',
+                    }))
                 });
-            } else if (!info) {
-                 return NextResponse.json({ error: 'This extraction requires the Railway Backend to be online.' }, { status: 500 });
+            } catch (e: any) {
+                return NextResponse.json({ error: `Resolution failed: ${e.message}` }, { status: 502 });
             }
 
-            const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
-            const makeProxyUrl = (targetUrl: string) => {
-                if (!targetUrl) return '';
-                return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
-            };
-
-            return NextResponse.json({
-                success: true,
-                title: info.title,
-                thumbnail: info.thumbnail,
-                streamUrl: makeProxyUrl(info.url),
-                formats: info.formats?.filter((f: any) => f.url).map((f: any) => ({
-                    url: makeProxyUrl(f.url),
-                    ext: f.ext,
-                    note: f.format_note || f.quality || 'Auto',
-                    acodec: f.acodec,
-                    vcodec: f.vcodec
-                }))
+        } else if (action === 'extract-audio') {
+            if (!inputPath) return NextResponse.json({ error: 'Input required' }, { status: 400 });
+            const outFile = path.join(downloadsDir, `audio-${runId}.mp3`);
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath!).output(outFile).noVideo().audioCodec('libmp3lame').on('end', resolve).on('error', reject).run();
             });
+            return NextResponse.json({ success: true, url: `/downloads/audio-${runId}.mp3`, type: 'audio' });
+
+        } else if (action === 'trim-audio') {
+            if (!inputPath) return NextResponse.json({ error: 'Input required' }, { status: 400 });
+            const outFile = path.join(downloadsDir, `trimmed-${runId}.mp3`);
+            await new Promise((resolve, reject) => {
+                ffmpeg(inputPath!).setStartTime(startTime).setDuration(duration).output(outFile).audioCodec('libmp3lame').on('end', resolve).on('error', reject).run();
+            });
+            return NextResponse.json({ success: true, url: `/downloads/trimmed-${runId}.mp3`, type: 'audio' });
+
+        } else if (action === 'merge-audio') {
+            if (!fileUrls || fileUrls.length === 0) return NextResponse.json({ error: 'fileUrls required' }, { status: 400 });
+            const outFile = path.join(downloadsDir, `merged-${runId}.mp3`);
+            const command = ffmpeg();
+            for (const fUrl of fileUrls) {
+                const p = fUrl.startsWith('/downloads') ? path.join(process.cwd(), 'public', fUrl) : (fUrl.startsWith('http') ? fUrl : path.join(process.cwd(), 'public', fUrl));
+                if (fs.existsSync(p as string) || (p as string).startsWith('http')) command.input(p as string);
+            }
+            await new Promise((resolve, reject) => { command.on('end', resolve).on('error', reject).mergeToFile(outFile, downloadsDir); });
+            return NextResponse.json({ success: true, url: `/downloads/merged-${runId}.mp3`, type: 'audio' });
 
         } else {
             return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

@@ -96,10 +96,11 @@ const LAB_SUBSCRIPTIONS = [
         description: 'Individual video studio.',
         features: [
             '1 Month Ad-Free',
-            'Unlimited YT/IG',
-            '200 TikTok Extracts',
-            '15min Std Duration',
-            '5min TikTok Limit'
+            'Unlimited YouTube & Instagram',
+            '200 TikTok Extractions',
+            '1 Hour YouTube Video Length',
+            '1 Hour Instagram Video Length',
+            '5 Minutes TikTok Video Length'
         ],
         icon: <Music className="w-6 h-6 text-pink-400" />,
         type: 'subscription',
@@ -114,16 +115,35 @@ const LAB_SUBSCRIPTIONS = [
         description: 'Elite production suite.',
         features: [
             '2 Months Ad-Free',
-            'Unlimited YT/IG',
-            '500 TikTok Extracts',
-            '15hr Std Duration',
-            '10min TikTok Limit'
+            'Unlimited YouTube & Instagram',
+            '500 TikTok Extractions',
+            '2 Hours YouTube Video Length',
+            '2 Hours Instagram Video Length',
+            '10 Minutes TikTok Video Length'
         ],
         icon: <Music className="w-6 h-6 text-yellow-400" />,
         popular: true,
         type: 'subscription',
         planName: 'pro',
         color: 'from-yellow-500/20 to-transparent'
+    },
+    {
+        id: 'silver-credits',
+        credits: 500,
+        price: 3000,
+        label: '500 Silver Credits',
+        description: 'Permanent bridge pack.',
+        features: [
+            '500 Permanent Credits',
+            'Never Expires',
+            'Skip Lab Ads Instantly',
+            '30 Min YouTube Video Length',
+            '30 Min Instagram Video Length',
+            '90 Sec TikTok Video Length'
+        ],
+        icon: <Zap className="w-6 h-6 text-slate-300" />,
+        type: 'silver_credits',
+        color: 'from-slate-500/20 to-transparent'
     }
 ];
 
@@ -252,7 +272,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                     </div>
                                 </header>
 
-                                <div className={`grid gap-4 mb-6 flex-grow overflow-y-auto px-2 py-4 custom-scrollbar ${activeTab === 'credits' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto w-full'}`}>
+                                <div className={`grid gap-4 mb-6 flex-grow overflow-y-auto px-2 py-4 custom-scrollbar ${activeTab === 'credits' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-3 max-w-5xl mx-auto w-full'}`}>
                                     {currentList.map((pkg) => (
                                         <button
                                             key={pkg.id}

@@ -8,8 +8,9 @@ import dynamic from 'next/dynamic';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Clock, ShieldCheck, Layers, BadgeCheck } from 'lucide-react';
 import AdGate from '@/components/AdGate';
+import Link from 'next/link';
 
 const PaymentModal = dynamic(() => import('@/components/PaymentModal'), { ssr: false });
 
@@ -17,12 +18,16 @@ type Profile = {
   credits: number;
   free_credits: number;
   subscription_tier: string;
+  plan_expires_at: string | null;
+  tiktok_extractions_remaining: number;
+  silver_credits: number;
 };
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [nextPlan, setNextPlan] = useState<any>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
@@ -52,7 +57,10 @@ export default function Home() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
-      else setProfile(null);
+      else {
+        setProfile(null);
+        setNextPlan(null);
+      }
     });
 
     return () => {
@@ -62,13 +70,31 @@ export default function Home() {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
+    // 1. Fetch Profile Data
+    const { data: profData, error: profError } = await supabase
       .from('profiles')
-      .select('credits, free_credits, subscription_tier')
+      .select('credits, free_credits, subscription_tier, plan_expires_at, tiktok_extractions_remaining, silver_credits')
       .eq('id', userId)
       .single();
 
-    if (!error && data) setProfile(data);
+    if (!profError && profData) {
+      setProfile(profData);
+    }
+
+    // 2. Fetch Next Queued Plan (for Dashboard trust)
+    const { data: queueData } = await supabase
+      .from('subscription_queue')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (queueData && queueData.length > 0) {
+      setNextPlan(queueData[0]);
+    } else {
+      setNextPlan(null);
+    }
   };
 
   return (
@@ -159,30 +185,36 @@ export default function Home() {
                 <div className="flex items-center gap-8">
                   {user ? (
                     <>
-                      <div className="flex items-center gap-3 px-6 py-3 bg-white/[0.03] border border-white/10 rounded-2xl transition-all hover:bg-white/[0.06] group/wallet">
-                        <div className="flex flex-col items-end border-r border-white/10 pr-3 mr-1">
-                          <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${profile?.subscription_tier !== 'free' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]'} animate-pulse`} />
+                      <div className="flex items-center gap-4">
+                        <Link
+                          href="/dashboard"
+                          className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors"
+                        >
+                          Dashboard
+                        </Link>
+
+                        <div className="flex items-center gap-3 px-6 py-3 bg-[#0a0a0a] border border-white/5 rounded-2xl">
+                          <div className="flex items-center gap-1.5 border-r border-white/5 pr-4">
+                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
                             <span className="text-[10px] font-black text-white uppercase tracking-widest">
                               Gold: {profile?.credits ?? 0}
                             </span>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_10px_rgba(161,161,170,0.4)] animate-pulse" />
-                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{profile?.free_credits ?? 0} Silver</span>
+                          <div className="flex items-center gap-1.5 border-r border-white/5 pr-4">
+                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                            <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
+                              {profile?.silver_credits ?? profile?.free_credits ?? 0} Silver
+                            </span>
                           </div>
                           <button
                             onClick={() => setShowAdForCredits(true)}
-                            className="px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-lg text-[9px] font-black text-purple-400 uppercase tracking-widest hover:bg-purple-500/20 transition-all flex items-center gap-1.5"
+                            className="bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-xl border border-purple-500/20 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
                           >
-                            <Sparkles className="w-2.5 h-2.5 animate-pulse" />
+                            <Sparkles className="w-3 h-3 animate-pulse" />
                             Earn
                           </button>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
+
                         <button
                           onClick={() => setIsPaymentOpen(true)}
                           className="bg-white text-black text-xs font-black px-6 py-3 rounded-2xl shadow-2xl hover:bg-white/90 transition-all active:scale-95 group flex items-center gap-2 uppercase tracking-wider"
@@ -295,6 +327,105 @@ export default function Home() {
               </header>
 
               <div className="relative z-10">
+                {/* Dedicated Studio Status Dashboard */}
+                <AnimatePresence>
+                  {user && profile && (
+                    <motion.section
+                      id="studio-dashboard"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="max-w-7xl mx-auto px-8 mb-20 scroll-mt-32"
+                    >
+                      <div className="bg-[#0a0a0a]/80 border border-white/5 rounded-[2.5rem] p-10 backdrop-blur-3xl flex flex-col lg:flex-row items-center justify-between gap-12 overflow-hidden relative group/hero shadow-2xl ring-1 ring-white/10">
+                        {/* Interactive Glows */}
+                        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-purple-500/10 blur-[100px] -mr-48 -mt-48 transition-all duration-700 group-hover/hero:bg-purple-500/20" />
+                        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-500/10 blur-[100px] -ml-48 -mb-48 transition-all duration-700 group-hover/hero:bg-blue-500/20" />
+
+                        <div className="flex flex-col gap-2 relative z-10 w-full lg:w-auto">
+                          <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500 mb-4 flex items-center gap-3">
+                            <span className="w-8 h-[1px] bg-zinc-800" /> Studio Status
+                          </h2>
+                          <div className="flex items-center gap-6">
+                            <div className={`p-6 rounded-[1.8rem] bg-gradient-to-br border shadow-xl ${profile.subscription_tier === 'pro' ? 'from-purple-600/30 to-purple-900/40 border-purple-500/40 shadow-purple-900/20' :
+                                profile.subscription_tier === 'starter' ? 'from-blue-600/30 to-blue-900/40 border-blue-500/40 shadow-blue-900/20' :
+                                  'from-zinc-900 to-black border-white/10'
+                              }`}>
+                              <ShieldCheck className={`w-8 h-8 ${profile.subscription_tier === 'pro' ? 'text-purple-400' : profile.subscription_tier === 'starter' ? 'text-blue-400' : 'text-zinc-600'}`} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3 mb-1">
+                                <h3 className="text-4xl font-black uppercase tracking-tighter italic text-white">
+                                  {profile.subscription_tier || 'Free'} Plan
+                                </h3>
+                                <BadgeCheck className={`w-5 h-5 ${profile.subscription_tier !== 'free' ? 'text-emerald-400' : 'text-zinc-800'}`} />
+                              </div>
+                              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <Clock className="w-3 h-3" />
+                                {profile.plan_expires_at ? `Expiring on ${new Date(profile.plan_expires_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}` : 'Standard Studio Access'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Queued Plan - The "Stacking" Visibility */}
+                        <div className="relative z-10 w-full lg:w-auto min-w-[280px]">
+                          {nextPlan ? (
+                            <motion.div
+                              initial={{ scale: 0.95, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="bg-emerald-500/5 border border-emerald-500/20 rounded-[2rem] p-8 relative overflow-hidden group/stack"
+                            >
+                              <div className="absolute inset-0 bg-emerald-500/5 translate-y-full group-hover/stack:translate-y-0 transition-transform duration-500" />
+                              <div className="relative z-10">
+                                <div className="flex items-center gap-4 mb-3">
+                                  <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
+                                    <Layers className="w-5 h-5 animate-bounce" />
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400/60 block mb-0.5">Next Plan (Stacked)</span>
+                                    <span className="text-lg font-black uppercase italic text-white tracking-tight">{nextPlan.plan_id.replace('_', ' ')}</span>
+                                  </div>
+                                </div>
+                                <p className="text-[10px] text-zinc-500 leading-relaxed font-bold uppercase tracking-wide">Ready to activate instantly when current plan ends.</p>
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <div className="h-full border border-white/5 border-dashed rounded-[2rem] p-8 flex flex-col items-center justify-center gap-3 opacity-30">
+                              <Layers className="w-8 h-8 text-zinc-800" />
+                              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-zinc-600">No Queued Plans</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Wealth Index */}
+                        <div className="flex items-center gap-12 relative z-10 bg-white/5 p-8 rounded-[2rem] border border-white/5 shadow-inner">
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="text-4xl font-black italic tracking-tighter text-white">
+                              {profile.credits ?? 0}
+                            </span>
+                            <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20">
+                              <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-yellow-500">Gold Credits</span>
+                            </div>
+                          </div>
+                          
+                          <div className="w-[1px] h-12 bg-white/10" />
+
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="text-4xl font-black italic tracking-tighter text-zinc-400">
+                              {profile.silver_credits ?? profile.free_credits ?? 0}
+                            </span>
+                            <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${profile.silver_credits ? 'bg-zinc-100/10 border-zinc-100/20 text-white' : 'bg-white/5 border-white/5 text-zinc-600'}`}>
+                              <div className={`w-1.5 h-1.5 rounded-full ${profile.silver_credits ? 'bg-white animate-pulse' : 'bg-zinc-800'}`} />
+                              <span className="text-[9px] font-black uppercase tracking-[0.2em]">{profile.silver_credits ? 'Permanent' : 'Free Silver'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.section>
+                  )}
+                </AnimatePresence>
+
                 <UnifiedMediaStudio
                   userId={user?.id}
                 />

@@ -8,9 +8,10 @@ import {
     Beaker, Upload, Play, Download, Loader2,
     CheckCircle2, AlertCircle, Scissors, Plus,
     Music, Video, Zap, Trash2, Clock, Link as LinkIcon,
-    Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft
+    Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft, Crown
 } from 'lucide-react';
 import AdGate from './AdGate';
+import LabSubscriptions from './LabSubscriptions';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -48,6 +49,11 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
     const [trimPlaying, setTrimPlaying] = useState(false);
     const [markStart, setMarkStart] = useState<number | null>(null);
     const [markEnd, setMarkEnd] = useState<number | null>(null);
+
+    // New Subscription state
+    const [showSubscriptions, setShowSubscriptions] = useState(false);
+    const [durationLimitError, setDurationLimitError] = useState<any>(null);
+    const [isTikTokFallback, setIsTikTokFallback] = useState(false);
     const trimAudioRef = useRef<HTMLAudioElement>(null);
     const trimWaveformRef = useRef<HTMLCanvasElement>(null);
     const trimProgressRef = useRef<HTMLDivElement>(null);
@@ -91,12 +97,52 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
 
     const fetchProfile = async () => {
         if (!userId) return;
-        const { data } = await supabase
+        const { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', userId)
             .single();
-        if (data) setProfile(data);
+        
+        if (profile) {
+            const now = new Date();
+            const expiry = profile.plan_expires_at ? new Date(profile.plan_expires_at) : null;
+            
+            // Auto-activate queued plan if current one is expired
+            if (!expiry || expiry <= now) {
+                const { data: queue } = await supabase
+                    .from('subscription_queue')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: true })
+                    .limit(1)
+                    .single();
+                
+                if (queue) {
+                    const newExpiry = new Date();
+                    newExpiry.setDate(newExpiry.getDate() + queue.duration_days);
+                    
+                    const { data: updatedProfile, error: updateError } = await supabase
+                        .from('profiles')
+                        .update({
+                            subscription_tier: queue.tier,
+                            plan_expires_at: newExpiry.toISOString(),
+                            plan_started_at: new Date().toISOString(),
+                            tiktok_extractions_remaining: queue.tiktok_allotment
+                        })
+                        .eq('id', userId)
+                        .select()
+                        .single();
+                        
+                    if (!updateError) {
+                        await supabase.from('subscription_queue').update({ status: 'active' }).eq('id', queue.id);
+                        setProfile(updatedProfile);
+                        return;
+                    }
+                }
+            }
+            setProfile(profile);
+        }
     };
 
     const awardCredit = async () => {
@@ -141,16 +187,20 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
             // 1. ALL LINKS: Use our stable server-side API (Railway Detective + Cloudflare Courier)
             const res = await fetch('/api/video-edit', {
                 method: 'POST',
-                body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
+                body: JSON.stringify({ action: 'resolve-url', url: pastedUrl, userId })
             });
             const data = await res.json();
-            if (data.success) {
+            if (res.ok) {
                 setResolvedInfo({
                     title: data.title,
                     thumbnail: data.thumbnail,
                     url: data.streamUrl,
                     formats: data.formats
                 });
+                setIsTikTokFallback(data.isTikTokFallback || false);
+            } else if (res.status === 403 && data.isDurationError) {
+                setDurationLimitError(data);
+                setError(data.error);
             } else {
                 throw new Error(data.error || 'Failed to resolve link.');
             }
@@ -514,6 +564,16 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                     </div>
 
                     <div className="flex items-center gap-4">
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => setShowSubscriptions(true)}
+                            className="bg-white/5 hover:bg-white/10 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 flex items-center gap-2"
+                        >
+                            <Crown className="w-3.5 h-3.5 text-purple-400" />
+                            Subscriptions
+                        </motion.button>
+
                         <div className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl border transition-all duration-1000 ${loaded ? 'border-green-500/30 bg-green-500/5 text-green-400' : 'border-zinc-800 bg-zinc-900/50 text-zinc-500'}`}>
                             <div className={`w-2 h-2 rounded-full ${loaded ? 'bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]' : 'bg-zinc-700'}`} />
                             <span className="text-xs font-black uppercase tracking-widest">{loaded ? 'Ready' : 'Initalizing engine'}</span>
@@ -587,6 +647,18 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                                                 {isResolving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Extract'}
                                             </button>
                                         </div>
+                                        {isTikTokFallback && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center gap-3 text-blue-400"
+                                            >
+                                                <AlertCircle className="w-4 h-4" />
+                                                <span className="text-xs font-bold">
+                                                    TikTok links are currently being processed via a fallback method. This may take longer.
+                                                </span>
+                                            </motion.div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1019,6 +1091,52 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                     }
                 }}
             />
+
+            {showSubscriptions && (
+                <LabSubscriptions 
+                    userId={userId || ''} 
+                    onClose={() => setShowSubscriptions(false)} 
+                    onPurchase={(plan) => {
+                        window.alert(`Redirecting to Paystack for ${plan.name}... (Payment integration mock)`);
+                    }}
+                />
+            )}
+
+            <AnimatePresence>
+                {durationLimitError && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+                            className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full text-center"
+                        >
+                            <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <Clock className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white mb-2">Limit Reached</h3>
+                            <p className="text-zinc-400 mb-8 text-sm">
+                                {durationLimitError.error}
+                            </p>
+                            <div className="space-y-3">
+                                <button 
+                                    onClick={() => { setShowSubscriptions(true); setDurationLimitError(null); }}
+                                    className="w-full py-4 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl shadow-lg transition-all"
+                                >
+                                    Upgrade Studio
+                                </button>
+                                <button 
+                                    onClick={() => setDurationLimitError(null)}
+                                    className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
