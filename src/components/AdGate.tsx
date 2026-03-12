@@ -12,9 +12,11 @@ interface AdGateProps {
 }
 
 export default function AdGate({ isOpen, onClose, onComplete, type = 'required' }: AdGateProps) {
-    const [status, setStatus] = useState<'loading' | 'optimizing' | 'playing' | 'completed'>('loading');
+    const [status, setStatus] = useState<'loading' | 'optimizing' | 'waiting' | 'playing' | 'completed'>('loading');
     const [timeLeft, setTimeLeft] = useState(15);
     const [providerIndex, setProviderIndex] = useState(0);
+
+    const MONETAG_DIRECT_LINK = "https://omg10.com/4/10721609";
 
     const providers = [
         { name: 'Monetag', weight: 1 },
@@ -37,7 +39,7 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                 await new Promise(r => setTimeout(r, 1800));
 
                 // 3. Trigger Ad
-                setStatus('playing');
+                setStatus('waiting');
             };
 
             loadAd();
@@ -129,25 +131,46 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                                     </p>
                                 </div>
                             </div>
+                        ) : status === 'waiting' ? (
+                            <div className="flex flex-col items-center gap-8 text-center px-12">
+                                <div className="p-6 bg-purple-500/10 rounded-3xl border border-purple-500/20 shadow-2xl shadow-purple-500/10 mb-2">
+                                    <Play className="w-12 h-12 text-purple-400 fill-purple-400/20" />
+                                </div>
+                                <div className="space-y-4">
+                                    <h3 className="text-2xl font-black uppercase tracking-tighter italic">Ad Ready</h3>
+                                    <p className="text-white/40 text-sm font-medium leading-relaxed max-w-xs mx-auto">Click below to watch the ad and unlock your studio action instantly.</p>
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => {
+                                            window.open(MONETAG_DIRECT_LINK, '_blank');
+                                            setStatus('playing');
+                                        }}
+                                        className="mt-6 px-10 py-4 bg-white text-black text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-purple-50 transition-all shadow-xl shadow-white/10"
+                                    >
+                                        Watch Video Now
+                                    </motion.button>
+                                </div>
+                            </div>
                         ) : status === 'playing' ? (
                             <div className="w-full h-full flex flex-col items-center justify-center gap-6 p-12">
                                 <div className="h-20 w-20 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-900/40 border border-white/10">
                                     <Sparkles className="w-10 h-10 text-white" />
                                 </div>
                                 <div className="text-center space-y-2">
-                                    <h3 className="text-2xl font-black tracking-tight uppercase italic">Simplicity AI Studio</h3>
-                                    <p className="text-white/40 text-xs font-medium uppercase tracking-widest">Nigeria's #1 Creative Tool</p>
+                                    <h3 className="text-2xl font-black tracking-tight uppercase italic text-purple-400 animate-pulse">Ad Processing...</h3>
+                                    <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em]">Stay on this page while the ad finishes</p>
                                 </div>
-                                <div className="w-64 h-1 bg-white/5 rounded-full overflow-hidden">
+                                <div className="w-64 h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
                                     <motion.div
-                                        className="h-full bg-purple-500"
+                                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
                                         initial={{ width: "0%" }}
                                         animate={{ width: "100%" }}
                                         transition={{ duration: 15, ease: "linear" }}
                                     />
                                 </div>
                                 <div className="mt-8 px-8 py-3 bg-white/5 border border-white/10 rounded-2xl text-[9px] font-black uppercase tracking-widest text-white/30 text-center max-w-xs">
-                                    Ads support zero-cost media processing for everyone.
+                                    Verification will complete automatically.
                                 </div>
                             </div>
                         ) : (

@@ -18,7 +18,6 @@ type Profile = {
     subscription_tier: string;
     plan_expires_at: string | null;
     tiktok_extractions_remaining: number;
-    silver_credits: number;
 };
 
 export default function DashboardPage() {
@@ -217,7 +216,7 @@ export default function DashboardPage() {
                                     {/* Silver Hub */}
                                     <div className="p-8 bg-zinc-900/50 border border-white/5 rounded-[2.5rem] relative overflow-hidden">
                                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 block mb-4">Silver Credits</span>
-                                        <div className="text-6xl font-black italic tracking-tighter text-white/50 mb-2">{profile?.silver_credits ?? 0}</div>
+                                        <div className="text-6xl font-black italic tracking-tighter text-white/50 mb-2">{profile?.free_credits ?? 0}</div>
                                         <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest flex items-center gap-2">
                                             <BadgeCheck className="w-3 h-3" />
                                             Permanent Ad-Skipping Balance

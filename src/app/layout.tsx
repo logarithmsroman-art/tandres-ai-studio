@@ -13,12 +13,15 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.tandres.online"),
+  metadataBase: new URL("https://tandresai.online"),
   title: "Tandres Simplicity AI Studio",
   description: "Next-gen AI media tools for content creators.",
   icons: {
     icon: "/favicon.png",
     apple: "/logo.png",
+  },
+  other: {
+    "monetag": "verification_code_here"
   }
 };
 
