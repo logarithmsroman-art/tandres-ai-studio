@@ -209,18 +209,45 @@ export async function POST(req: NextRequest) {
                 }
             }
 
-            // Default handler for Instagram and others
-            const info: any = await youtubedl(url, {
-                dumpSingleJson: true,
-                noWarnings: true,
-                preferFreeFormats: true,
-                addHeader: [
-                    'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-                    'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                    'Accept-Language:en-US,en;q=0.9',
-                    'Referer:https://www.instagram.com/'
-                ]
-            });
+            // Default handler for Instagram and others (Instagram, Facebook, etc.)
+            let info: any = null;
+            
+            // PRODUCTION: Use Railway as detective (Fixes python3 error)
+            if (!isLocal && railwayUrl) {
+                try {
+                    const res = await fetch(`${railwayUrl}/resolve`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        info = {
+                            title: data.title,
+                            thumbnail: data.thumbnail,
+                            url: data.rawUrl,
+                            formats: data.formats
+                        };
+                    }
+                } catch (e) {
+                    console.error('[video-edit] Railway detective failed for Instagram:', e);
+                }
+            }
+
+            // FALLBACK / LOCAL: Use local detective
+            if (!info) {
+                info = await youtubedl(url, {
+                    dumpSingleJson: true,
+                    noWarnings: true,
+                    preferFreeFormats: true,
+                    addHeader: [
+                        'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                        'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                        'Accept-Language:en-US,en;q=0.9',
+                        'Referer:https://www.instagram.com/'
+                    ]
+                });
+            }
 
             const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
             const makeProxyUrl = (targetUrl: string) => {
