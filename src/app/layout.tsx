@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,9 +21,6 @@ export const metadata: Metadata = {
     icon: "/favicon.png",
     apple: "/logo.png",
   },
-  other: {
-    "monetag": "verification_code_here"
-  }
 };
 
 export default function RootLayout({
@@ -32,6 +30,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Monetag Multitag - Dreamy Tag */}
+        <Script
+          src="https://quge5.com/88/tag.min.js"
+          data-zone="219149"
+          strategy="afterInteractive"
+          data-cfasync="false"
+        />
+      </head>
       <body
         className={`${inter.variable} ${outfit.variable} antialiased`}
       >
