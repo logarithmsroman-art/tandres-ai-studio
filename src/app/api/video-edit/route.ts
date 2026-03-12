@@ -257,13 +257,13 @@ export async function POST(req: Request) {
             const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
             const isInstagram = url.includes('instagram.com');
             const isLocal = process.env.NODE_ENV === 'development';
-            // Production: Route YouTube & Instagram through Railway first (reliable yt-dlp)
+            // Production: Route YouTube through Railway (reliable yt-dlp)
             const railwayUrl = process.env.RAILWAY_URL || '';
-            if ((isYouTube || isInstagram) && !isLocal && railwayUrl) {
-                console.log(`[video-edit] ${isYouTube ? 'YouTube' : 'Instagram'} (PROD) \u2192 Railway /api/stream`);
+            if (isYouTube && !isLocal && railwayUrl) {
+                console.log(`[video-edit] YouTube (PROD) \u2192 Railway /api/stream`);
                 return NextResponse.json({
                     success: true,
-                    title: isYouTube ? 'YouTube Video' : 'Instagram Video',
+                    title: 'YouTube Video',
                     thumbnail: '',
                     streamUrl: `${railwayUrl}/api/stream?url=${encodeURIComponent(url)}`,
                 });
@@ -338,13 +338,20 @@ export async function POST(req: Request) {
                     ]
                 });
 
+                const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
+
+                // Route through Cloudflare worker to save Vercel bandwidth for free zero-cost streaming
+                const makeProxyUrl = (targetUrl: string) => {
+                    return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+                };
+
                 return NextResponse.json({
                     success: true,
                     title: info.title,
                     thumbnail: info.thumbnail,
-                    streamUrl: `/api/proxy?url=${encodeURIComponent(info.url)}`,
+                    streamUrl: makeProxyUrl(info.url),
                     formats: info.formats?.filter((f: any) => f.url).map((f: any) => ({
-                        url: `/api/proxy?url=${encodeURIComponent(f.url)}`,
+                        url: makeProxyUrl(f.url),
                         ext: f.ext,
                         note: f.format_note || f.quality || 'Auto',
                         acodec: f.acodec,
