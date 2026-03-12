@@ -138,89 +138,21 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
 
         try {
             // STRATEGY: 
-            // 1. IF (YT or IG) + PROD: Try Client-side mirrors (Zero Cost / Bypass)
-            // 2. IF LOCAL DEV OR TIKTOK: Use our stable server-side API (Direct/Tunneled)
-
-            if (isYouTube && !isLocal) {
-                // CLIENT-SIDE MIRROR RESOLUTION for YT PROD (Zero Cost)
-                const mirrored_endpoints = [
-                    'https://api.cobalt.tools',
-                    'https://cobalt.meowing.de',
-                    'https://cobalt.canine.tools',
-                    'https://cobalt.directory'
-                ];
-
-                let successfulData = null;
-                for (const mirror of mirrored_endpoints) {
-                    try {
-                        const mRes = await fetch(mirror, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                url: pastedUrl,
-                                videoQuality: '1080',
-                                audioFormat: 'best',
-                                downloadMode: isAudioOnly ? 'audio' : 'auto',
-                                filenameStyle: 'nerdy'
-                            }),
-                            signal: AbortSignal.timeout(8000)
-                        });
-
-                        if (mRes.ok) {
-                            successfulData = await mRes.json();
-                            if (successfulData.status === 'error') throw new Error(successfulData.text);
-                            break;
-                        }
-                    } catch (e) {
-                        continue; // try next mirror
-                    }
-                }
-
-                if (successfulData && (successfulData.url || successfulData.picker)) {
-                    setResolvedInfo({
-                        title: successfulData.text || 'Extracted Video',
-                        thumbnail: '',
-                        url: successfulData.url || (successfulData.picker && successfulData.picker[0]?.url),
-                        formats: successfulData.picker
-                    });
-                } else {
-                    // Fallback to our own server if mirrors are down
-                    const res = await fetch('/api/video-edit', {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        setResolvedInfo({
-                            title: data.title,
-                            thumbnail: data.thumbnail,
-                            url: data.streamUrl,
-                            formats: data.formats
-                        });
-                    } else {
-                        throw new Error(data.error || 'YouTube extraction is currently unavailable.');
-                    }
-                }
-            } else {
-                // USE STABLE SERVER EXTRACTION FOR TIKTOK / INSTAGRAM
-                const res = await fetch('/api/video-edit', {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
+            // 1. ALL LINKS: Use our stable server-side API (Railway Detective + Cloudflare Courier)
+            const res = await fetch('/api/video-edit', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setResolvedInfo({
+                    title: data.title,
+                    thumbnail: data.thumbnail,
+                    url: data.streamUrl,
+                    formats: data.formats
                 });
-                const data = await res.json();
-                if (data.success) {
-                    setResolvedInfo({
-                        title: data.title,
-                        thumbnail: data.thumbnail,
-                        url: data.streamUrl,
-                        formats: data.formats
-                    });
-                } else {
-                    throw new Error(data.error || 'Failed to resolve link.');
-                }
+            } else {
+                throw new Error(data.error || 'Failed to resolve link.');
             }
         } catch (err: any) {
             console.error('Resolution error:', err);

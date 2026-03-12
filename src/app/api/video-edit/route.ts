@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url }),
-                        signal: AbortSignal.timeout(12000)
+                        signal: AbortSignal.timeout(15000)
                     });
                     const data = await res.json();
                     if (data.success) {
@@ -221,18 +221,12 @@ export async function POST(req: NextRequest) {
                                 vcodec: f.vcodec
                             }))
                         });
+                    } else if (data.error) {
+                        throw new Error(data.error);
                     }
-                } catch (e) {
-                    console.error('[video-edit] Zero-cost YouTube failed, trying mirrors...');
-                }
-            }
-
-            if (isYouTube && !isLocal) {
-                try {
-                    const data = await mirroredResolve(url);
-                    return NextResponse.json(data);
                 } catch (e: any) {
-                    return NextResponse.json({ error: 'YouTube extraction is temporarily unavailable.' }, { status: 503 });
+                    console.error('[video-edit] Zero-cost YouTube failed:', e);
+                    return NextResponse.json({ error: `YouTube extraction failed: ${e.message}` }, { status: 502 });
                 }
             }
 
