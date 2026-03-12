@@ -5,6 +5,26 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { mkdtemp, unlink, rm } = require('fs/promises');
+const https = require('https');
+const http = require('http');
+
+// Helper to expand shortlinks (vt.tiktok.com -> tiktok.com/@user/video/123)
+const expandUrl = (shortUrl) => {
+    return new Promise((resolve) => {
+        const client = shortUrl.startsWith('https') ? https : http;
+        client.get(shortUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+            }
+        }, (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                resolve(res.headers.location);
+            } else {
+                resolve(shortUrl);
+            }
+        }).on('error', () => resolve(shortUrl));
+    });
+};
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +46,12 @@ app.get('/stream', async (req, res) => {
         return res.status(400).json({ error: 'URL is required' });
     }
 
+    let finalUrl = url;
+    if (url.includes('vt.tiktok.com') || url.includes('vm.tiktok.com')) {
+        finalUrl = await expandUrl(url);
+        console.log('[railway] Expanded shortlink:', finalUrl);
+    }
+
     console.log('[railway] New extraction request:', url.substring(0, 80));
 
     let tmpDir = null;
@@ -36,15 +62,13 @@ app.get('/stream', async (req, res) => {
         outputPath = path.join(tmpDir, 'video.mp4');
 
         const isTikTok = url.includes('tiktok.com');
-        const referer = isTikTok ? 'https://www.tiktok.com/' : 'https://www.instagram.com/';
-
-        console.log('[railway] Downloading via yt-dlp...');
         const ytDlpOptions = {
             noWarnings: true,
             format: 'best[ext=mp4]/best',
             output: outputPath,
+            'extractor-args': 'youtube:player-client=ios',
             addHeader: [
-                'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
                 `Referer:${referer}`,
             ],
         };
@@ -54,7 +78,15 @@ app.get('/stream', async (req, res) => {
             ytDlpOptions.cookies = cookiesPath;
         }
 
-        await youtubedl(url, ytDlpOptions);
+        try {
+            await youtubedl(finalUrl, ytDlpOptions);
+        } catch (downloadError) {
+            console.error('[railway] yt-dlp direct error:', downloadError.message);
+            // Sometimes yt-dlp throws but still creates the file
+            if (!fs.existsSync(outputPath)) {
+                throw new Error(`Download failed: ${downloadError.message.split('\n')[0]}`);
+            }
+        }
 
         if (!fs.existsSync(outputPath)) {
             throw new Error('Download failed — file not found after yt-dlp');
@@ -101,16 +133,23 @@ app.post('/resolve', async (req, res) => {
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
     try {
-        const isTikTok = url.includes('tiktok.com');
-        const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+        let finalUrl = url;
+        if (url.includes('vt.tiktok.com') || url.includes('vm.tiktok.com')) {
+            finalUrl = await expandUrl(url);
+            console.log('[railway] Expanded shortlink for resolve:', finalUrl);
+        }
+
+        const isTikTok = finalUrl.includes('tiktok.com');
+        const isYouTube = finalUrl.includes('youtube.com') || finalUrl.includes('youtu.be');
         const referer = isTikTok ? 'https://www.tiktok.com/' : (isYouTube ? 'https://www.youtube.com/' : 'https://www.instagram.com/');
 
         const ytDlpOptions = {
             dumpSingleJson: true,
             noWarnings: true,
             noCheckCertificates: true,
+            'extractor-args': 'youtube:player-client=ios',
             addHeader: [
-                'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
                 `Referer:${referer}`,
             ],
         };
@@ -120,7 +159,7 @@ app.post('/resolve', async (req, res) => {
             ytDlpOptions.cookies = cookiesPath;
         }
 
-        const info = await youtubedl(url, ytDlpOptions);
+        const info = await youtubedl(finalUrl, ytDlpOptions);
 
         const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN
             ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
