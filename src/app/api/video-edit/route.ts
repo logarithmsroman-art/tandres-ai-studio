@@ -326,22 +326,39 @@ export async function POST(req: Request) {
                 }
 
                 // For Instagram / other direct links
-                const info: any = await youtubedl(url, {
-                    dumpSingleJson: true,
-                    noWarnings: true,
-                    preferFreeFormats: true,
-                    addHeader: [
-                        'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-                        'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                        'Accept-Language:en-US,en;q=0.9',
-                        'Referer:https://www.instagram.com/'
-                    ]
-                });
+                let info: any = null;
+                const railwayUrl = process.env.RAILWAY_URL || '';
+
+                if (isInstagram && railwayUrl && !isLocal) {
+                    console.log('[video-edit] Instagram \u2192 Railway /resolve');
+                    const resolveRes = await fetch(`${railwayUrl}/resolve`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url })
+                    });
+                    if (!resolveRes.ok) throw new Error('Railway resolve failed');
+                    const data = await resolveRes.json();
+                    if (!data.success) throw new Error(data.error);
+                    info = { title: data.title, thumbnail: data.thumbnail, url: data.rawUrl, formats: data.formats };
+                } else {
+                    info = await youtubedl(url, {
+                        dumpSingleJson: true,
+                        noWarnings: true,
+                        preferFreeFormats: true,
+                        addHeader: [
+                            'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                            'Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                            'Accept-Language:en-US,en;q=0.9',
+                            'Referer:https://www.instagram.com/'
+                        ]
+                    });
+                }
 
                 const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
 
                 // Route through Cloudflare worker to save Vercel bandwidth for free zero-cost streaming
                 const makeProxyUrl = (targetUrl: string) => {
+                    if (!targetUrl) return '';
                     return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
                 };
 

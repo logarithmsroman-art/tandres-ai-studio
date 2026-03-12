@@ -112,7 +112,8 @@ app.post('/resolve', async (req, res) => {
             success: true,
             title: info.title || 'Video',
             thumbnail: info.thumbnail || '',
-            // Return a stream URL pointing back to this server
+            rawUrl: info.url,
+            formats: info.formats,
             streamUrl: `${baseUrl}/stream?url=${encodeURIComponent(url)}`,
         });
     } catch (error) {
