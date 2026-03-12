@@ -114,34 +114,64 @@ export async function POST(req: NextRequest) {
 
             try {
                 let mediaInfo: any = null;
-                if (!isLocal && railwayUrl) {
-                    const res = await fetch(`${railwayUrl}/resolve`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url }),
-                        signal: AbortSignal.timeout(15000)
-                    });
-                    const data = await res.json();
-                    if (!data.success) throw new Error(data.error || 'Resolution failed');
-                    mediaInfo = data;
-                } else {
-                    const ytDlpOptions: any = {
-                        dumpSingleJson: true,
-                        noWarnings: true,
-                        addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
-                    };
-                    const cookiesPath = path.join(process.cwd(), 'cookies.txt');
-                    if (fs.existsSync(cookiesPath)) {
-                        ytDlpOptions.cookies = cookiesPath;
+                const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
+                let ytDlpError = '';
+                try {
+                    if (!isLocal && railwayUrl) {
+                        const res = await fetch(`${railwayUrl}/resolve`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url }),
+                            signal: AbortSignal.timeout(15000)
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                            ytDlpError = data.error || 'Resolution failed';
+                            throw new Error(ytDlpError);
+                        }
+                        mediaInfo = data;
+                    } else {
+                        const ytDlpOptions: any = {
+                            dumpSingleJson: true,
+                            noWarnings: true,
+                            addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
+                        };
+                        const cookiesPath = path.join(process.cwd(), 'cookies.txt');
+                        if (fs.existsSync(cookiesPath)) {
+                            ytDlpOptions.cookies = cookiesPath;
+                        }
+                        mediaInfo = await youtubedl(url, ytDlpOptions);
+                        mediaInfo = {
+                            title: mediaInfo.title,
+                            thumbnail: mediaInfo.thumbnail,
+                            rawUrl: mediaInfo.url,
+                            duration: mediaInfo.duration,
+                            formats: mediaInfo.formats
+                        };
                     }
-                    mediaInfo = await youtubedl(url, ytDlpOptions);
-                    mediaInfo = {
-                        title: mediaInfo.title,
-                        thumbnail: mediaInfo.thumbnail,
-                        rawUrl: mediaInfo.url,
-                        duration: mediaInfo.duration,
-                        formats: mediaInfo.formats
-                    };
+                } catch (e: any) {
+                    // FALLBACK BLOCK: If yt-dlp fails, use bypass APIs
+                    if (isTikTok) {
+                        const bypassRes = await fetch(`https://tikwm.com/api/?url=${url}`);
+                        const bypassData = await bypassRes.json();
+                        if (bypassData.code === 0 && bypassData.data) {
+                            const d = bypassData.data;
+                            mediaInfo = {
+                                title: d.title || 'TikTok Video',
+                                thumbnail: d.cover,
+                                rawUrl: d.play || d.wmplay,
+                                duration: d.duration,
+                                formats: [{ url: d.play || d.wmplay, ext: 'mp4', note: 'HD' }]
+                            };
+                            if (d.music) {
+                                mediaInfo.formats.push({ url: d.music, ext: 'mp3', note: 'Audio' });
+                            }
+                        } else {
+                            throw new Error(ytDlpError || e.message);
+                        }
+                    } else {
+                        throw new Error(ytDlpError || e.message);
+                    }
                 }
 
                 const duration = Number(mediaInfo.duration) || 0;
@@ -176,7 +206,10 @@ export async function POST(req: NextRequest) {
                 const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
                 const makeProxyUrl = (targetUrl: string) => {
                     if (!targetUrl) return '';
-                    if (isTikTok) return `${railwayUrl}/api/stream?url=${encodeURIComponent(targetUrl)}`;
+                    // Only use Railway stream proxy if the URL is a TikTok PAGE URL, not a direct mp4 CDN link
+                    if (isTikTok && (targetUrl.includes('tiktok.com/@') || targetUrl.includes('vt.tiktok.com'))) {
+                        return `${railwayUrl}/api/stream?url=${encodeURIComponent(targetUrl)}`;
+                    }
                     return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
                 };
 
