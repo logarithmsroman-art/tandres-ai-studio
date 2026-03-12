@@ -192,12 +192,39 @@ export async function POST(req: NextRequest) {
             }
 
             if (isYouTube && !isLocal && railwayUrl) {
-                return NextResponse.json({
-                    success: true,
-                    title: 'YouTube Video',
-                    thumbnail: '',
-                    streamUrl: `${railwayUrl}/api/stream?url=${encodeURIComponent(url)}`,
-                });
+                try {
+                    // Zero Cost Logic for YouTube: Resolve via Railway, Stream via Cloudflare
+                    const res = await fetch(`${railwayUrl}/resolve`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url }),
+                        signal: AbortSignal.timeout(12000)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
+                        const makeProxyUrl = (targetUrl: string) => {
+                            if (!targetUrl) return '';
+                            return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
+                        };
+
+                        return NextResponse.json({
+                            success: true,
+                            title: data.title,
+                            thumbnail: data.thumbnail,
+                            streamUrl: makeProxyUrl(data.rawUrl),
+                            formats: data.formats?.filter((f: any) => f.url).map((f: any) => ({
+                                url: makeProxyUrl(f.url),
+                                ext: f.ext,
+                                note: f.format_note || f.quality || 'Auto',
+                                acodec: f.acodec,
+                                vcodec: f.vcodec
+                            }))
+                        });
+                    }
+                } catch (e) {
+                    console.error('[video-edit] Zero-cost YouTube failed, trying mirrors...');
+                }
             }
 
             if (isYouTube && !isLocal) {
