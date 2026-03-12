@@ -218,7 +218,8 @@ export async function POST(req: NextRequest) {
                     const res = await fetch(`${railwayUrl}/resolve`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url })
+                        body: JSON.stringify({ url }),
+                        signal: AbortSignal.timeout(12000) // 12-second timeout
                     });
                     const data = await res.json();
                     if (data.success) {
@@ -228,14 +229,17 @@ export async function POST(req: NextRequest) {
                             url: data.rawUrl,
                             formats: data.formats
                         };
+                    } else if (data.error) {
+                        throw new Error(`Railway Detective Error: ${data.error}`);
                     }
-                } catch (e) {
+                } catch (e: any) {
                     console.error('[video-edit] Railway detective failed for Instagram:', e);
+                    return NextResponse.json({ error: `Failed to find video link. (${e.message})` }, { status: 502 });
                 }
             }
 
-            // FALLBACK / LOCAL: Use local detective
-            if (!info) {
+            // LOCAL/FALLBACK: Only runs on your computer (where you have python3)
+            if (!info && isLocal) {
                 info = await youtubedl(url, {
                     dumpSingleJson: true,
                     noWarnings: true,
@@ -247,6 +251,8 @@ export async function POST(req: NextRequest) {
                         'Referer:https://www.instagram.com/'
                     ]
                 });
+            } else if (!info) {
+                 return NextResponse.json({ error: 'Instagram resolution is only available via Railway in production.' }, { status: 500 });
             }
 
             const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';

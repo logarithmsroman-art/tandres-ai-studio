@@ -141,8 +141,8 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
             // 1. IF (YT or IG) + PROD: Try Client-side mirrors (Zero Cost / Bypass)
             // 2. IF LOCAL DEV OR TIKTOK: Use our stable server-side API (Direct/Tunneled)
 
-            if ((isYouTube || isInstagram) && !isLocal) {
-                // CLIENT-SIDE MIRROR RESOLUTION for YT/IG PROD (Zero Cost)
+            if (isYouTube && !isLocal) {
+                // CLIENT-SIDE MIRROR RESOLUTION for YT PROD (Zero Cost)
                 const mirrored_endpoints = [
                     'https://api.cobalt.tools',
                     'https://cobalt.meowing.de',
