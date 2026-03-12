@@ -4,7 +4,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { mirroredResolve } from '@/lib/mirrors';
+// Removed unused mirrors import
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -158,7 +158,12 @@ export async function POST(req: NextRequest) {
             const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
             const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
             const isLocal = process.env.NODE_ENV === 'development';
-            const railwayUrl = process.env.RAILWAY_URL || '';
+            let railwayUrl = process.env.RAILWAY_URL || '';
+            
+            // Safety Belt: Ensure Railway URL starts with https://
+            if (railwayUrl && !railwayUrl.startsWith('http')) {
+                railwayUrl = `https://${railwayUrl}`;
+            }
 
             if (isTikTok) {
                 if (railwayUrl && !isLocal) {
