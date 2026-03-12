@@ -4,9 +4,10 @@
  */
 
 const MIRRORS = [
-    'https://cobalt.api.unext.xyz',
     'https://api.cobalt.tools',
-    'https://cobalt-api.v0l.cc'
+    'https://cobalt.meowing.de',
+    'https://cobalt.canine.tools',
+    'https://cobalt.directory'
 ];
 
 export async function mirroredResolve(url: string) {

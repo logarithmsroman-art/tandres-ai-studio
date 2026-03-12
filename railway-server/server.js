@@ -95,12 +95,16 @@ app.post('/resolve', async (req, res) => {
 
     try {
         const isTikTok = url.includes('tiktok.com');
+        const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+        const referer = isTikTok ? 'https://www.tiktok.com/' : (isYouTube ? 'https://www.youtube.com/' : 'https://www.instagram.com/');
+
         const info = await youtubedl(url, {
             dumpSingleJson: true,
             noWarnings: true,
+            noCheckCertificates: true,
             addHeader: [
                 'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-                `Referer:${isTikTok ? 'https://www.tiktok.com/' : 'https://www.instagram.com/'}`,
+                `Referer:${referer}`,
             ],
         });
 
