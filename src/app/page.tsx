@@ -205,13 +205,15 @@ export default function Home() {
                               {profile?.free_credits ?? (profile as any)?.silver_credits ?? 0} Silver
                             </span>
                           </div>
-                          <button
-                            onClick={() => setShowAdForCredits(true)}
-                            className="bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-xl border border-purple-500/20 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
-                          >
-                            <Sparkles className="w-3 h-3 animate-pulse" />
-                            Earn
-                          </button>
+                          {profile?.subscription_tier === 'free' && (
+                            <button
+                              onClick={() => setShowAdForCredits(true)}
+                              className="bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-xl border border-purple-500/20 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                            >
+                              <Sparkles className="w-3 h-3 animate-pulse" />
+                              Earn
+                            </button>
+                          )}
                         </div>
 
                         <button

@@ -420,8 +420,10 @@ export default function VideoEditTab({
             console.warn("Lock check failed, proceeding with caution.");
         }
 
-        // 2. Optimized Ad Logic (No more constant redirects)
-        if (profile?.subscription_tier === 'free') {
+        // 2. Optimized Ad Logic (Strict check for Free Tier)
+        const isPremium = profile?.subscription_tier && profile.subscription_tier !== 'free';
+
+        if (!isPremium) {
             if ((profile?.free_credits || 0) > 0) {
                 setIsSpending(true);
                 try {
@@ -992,7 +994,7 @@ export default function VideoEditTab({
 
                     {/* Right Panel: Output & Live Preview */}
                     <div className="xl:col-span-4 space-y-6">
-                        <AdBanner />
+                        {profile?.subscription_tier === 'free' && <AdBanner />}
                         <section className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8 space-y-6">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Live Workspace</h3>
 
