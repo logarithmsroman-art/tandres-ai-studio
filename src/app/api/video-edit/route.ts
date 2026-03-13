@@ -79,10 +79,10 @@ export async function POST(req: NextRequest) {
             const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
             const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
             const isLocal = process.env.NODE_ENV === 'development';
-            let railwayUrl = process.env.RAILWAY_URL || '';
+            let railwayUrl = process.env.RAILWAY_URL || 'http://localhost:3001';
 
             if (railwayUrl && !railwayUrl.startsWith('http')) {
-                railwayUrl = `https://${railwayUrl}`;
+                railwayUrl = `http://${railwayUrl}`;
             }
 
             // 1. Get User Profile and Tier
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ url }),
-                            signal: AbortSignal.timeout(25000)
+                            signal: AbortSignal.timeout(60000)
                         });
                         const data = await res.json();
                         if (data.success) {

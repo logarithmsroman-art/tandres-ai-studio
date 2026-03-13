@@ -4,77 +4,52 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const targetUrl = searchParams.get('url');
 
-    if (!targetUrl) {
-        return NextResponse.json({ error: 'URL required' }, { status: 400 });
-    }
+    if (!targetUrl) return NextResponse.json({ error: 'URL required' }, { status: 400 });
 
     try {
-        console.log('[proxy-api] Proxying:', targetUrl);
+        console.log('[proxy] Tunneling Media:', targetUrl);
 
-        // Forward critical headers - Standardized for TikTok 403 Bypass
+        // Map external public IP calls to internal localhost to bypass GCP Firewalls
+        let finalTarget = targetUrl;
+        if (targetUrl.includes('34.30.156.248:3001')) {
+            finalTarget = targetUrl.replace('34.30.156.248:3001', 'localhost:3001');
+        }
+
         const forwardHeaders: any = {
-            'User-Agent': req.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Referer': 'https://www.tiktok.com/',
-            'Origin': 'https://www.tiktok.com',
-            'Connection': 'keep-alive',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Referer': 'https://www.instagram.com/',
         };
 
-        // CRITICAL: TikTok often requires a Range header to initiate a stream
         const range = req.headers.get('range');
-        forwardHeaders['Range'] = range || 'bytes=0-';
+        if (range) forwardHeaders['Range'] = range;
 
-        const response = await fetch(targetUrl, {
+        const response = await fetch(finalTarget, {
             headers: forwardHeaders,
-            cache: 'no-store',
             redirect: 'follow'
         });
 
         if (!response.ok && response.status !== 206) {
-            console.error('[proxy-api] Target error:', response.status, response.statusText);
-            throw new Error(`Failed to fetch from target: ${response.status} ${response.statusText}`);
+            console.error('[proxy] Target fail:', response.status);
+            throw new Error(`Target returned ${response.status}`);
         }
 
-        // Forward the stream with necessary headers
         const headers = new Headers();
-        headers.set('Content-Type', response.headers.get('Content-Type') || 'application/octet-stream');
-
-        const contentLength = response.headers.get('Content-Length');
-        if (contentLength) {
-            headers.set('Content-Length', contentLength);
-        }
-
-        const contentRange = response.headers.get('Content-Range');
-        if (contentRange) {
-            headers.set('Content-Range', contentRange);
-        }
-
-        // CRITICAL FOR FFMPEG.WASM & CORS
+        headers.set('Content-Type', response.headers.get('Content-Type') || 'video/mp4');
         headers.set('Access-Control-Allow-Origin', '*');
-        headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
         headers.set('Accept-Ranges', 'bytes');
+        
+        const contentLen = response.headers.get('Content-Length');
+        if (contentLen) headers.set('Content-Length', contentLen);
+        
+        const contentRange = response.headers.get('Content-Range');
+        if (contentRange) headers.set('Content-Range', contentRange);
 
-        // Return the body stream
         return new Response(response.body, {
             status: response.status,
             headers,
         });
     } catch (error: any) {
-        console.error('[proxy-api] Error:', error);
-        return NextResponse.json({ error: `Proxy Error: ${error.message}` }, { status: 500 });
+        console.error('[proxy] Error:', error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
-}
-
-export async function OPTIONS() {
-    return new Response(null, {
-        status: 204,
-        headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, OPTIONS',
-            'Access-Control-Allow-Headers': 'Range, Content-Type',
-        },
-    });
 }
