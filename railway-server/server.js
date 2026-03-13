@@ -111,7 +111,13 @@ app.post('/resolve', async (req, res) => {
             result = await tryCobalt(finalUrl);
         }
 
-        if (result) {
+        // Final Safety: Ensure we have a URL
+        if (result && !result.url && result.formats) {
+            const bestFormat = result.formats.find(f => f.url);
+            if (bestFormat) result.url = bestFormat.url;
+        }
+
+        if (result && result.url) {
             console.log('[GCP] EXTRACTION SUCCESSFUL');
             const host = req.headers.host ? req.headers.host.split(':')[0] : '34.30.156.248';
             res.json({
