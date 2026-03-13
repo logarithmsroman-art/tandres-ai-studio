@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import VideoEditTab from '@/components/VideoEditTab';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const PaymentModal = dynamic(() => import('@/components/PaymentModal'), { ssr: false });
 
 export default function LabPage() {
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     useEffect(() => {
         const getUser = async () => {
@@ -29,7 +33,22 @@ export default function LabPage() {
 
     return (
         <main className="min-h-screen bg-black py-12 px-6 lg:px-12">
-            <VideoEditTab userId={user?.id} />
+            <VideoEditTab 
+                userId={user?.id} 
+                onOpenPayment={() => setIsPaymentOpen(true)}
+                refreshTrigger={refreshTrigger}
+            />
+            {user && (
+                <PaymentModal
+                    isOpen={isPaymentOpen}
+                    onClose={() => setIsPaymentOpen(false)}
+                    userEmail={user.email!}
+                    userId={user.id}
+                    onSuccess={() => {
+                        setRefreshTrigger(prev => prev + 1);
+                    }}
+                />
+            )}
         </main>
     );
 }

@@ -25,7 +25,17 @@ interface StreamInfo {
     formats?: any[];
 }
 
-export default function VideoEditTab({ userId, onSuccess }: { userId?: string, onSuccess?: () => void }) {
+export default function VideoEditTab({ 
+    userId, 
+    onOpenPayment, 
+    refreshTrigger, 
+    onSuccess 
+}: { 
+    userId?: string, 
+    onOpenPayment?: () => void,
+    refreshTrigger?: number,
+    onSuccess?: () => void 
+}) {
     const [loaded, setLoaded] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -550,7 +560,7 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
         load();
         fetchProfile();
         fetchLocks();
-    }, [userId]);
+    }, [userId, refreshTrigger]);
 
     const tools = [
         { id: 'audio-extractor', name: 'Audio Extraction', icon: Music, desc: 'Extract crystal-clear audio from any video link or local file.' },
@@ -1132,7 +1142,8 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                     userId={userId || ''} 
                     onClose={() => setShowSubscriptions(false)} 
                     onPurchase={(plan) => {
-                        window.alert(`Redirecting to Paystack for ${plan.name}... (Payment integration mock)`);
+                        onOpenPayment?.();
+                        setShowSubscriptions(false);
                     }}
                 />
             )}

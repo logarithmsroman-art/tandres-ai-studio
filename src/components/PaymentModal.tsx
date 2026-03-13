@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CreditCard, Zap, Check, ShieldCheck, Loader2, Music } from 'lucide-react';
 import { PaystackButton } from 'react-paystack';
@@ -152,6 +152,14 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
     const [selectedPack, setSelectedPack] = useState<any>(CREDIT_PACKS[1]);
     const [isVerifying, setIsVerifying] = useState(false);
 
+    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '';
+
+    useEffect(() => {
+        if (isOpen && !publicKey) {
+            console.error("[Paystack] Missing Public Key. Check your environment variables.");
+        }
+    }, [isOpen, publicKey]);
+
     const handleTabChange = (tab: 'credits' | 'subscriptions') => {
         setActiveTab(tab);
         if (tab === 'credits') setSelectedPack(CREDIT_PACKS[1]);
@@ -215,7 +223,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                 },
             ],
         },
-        publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+        publicKey: publicKey,
         text: activeTab === 'credits' ? "Purchase Credits" : "Subscribe Now",
         onSuccess: (res: any) => handlePaystackSuccessAction(res),
         onClose: handlePaystackCloseAction,
