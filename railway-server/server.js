@@ -28,7 +28,6 @@ const expandUrl = (shortUrl) => {
     });
 };
 
-// BYPASS LAYER 1: TikWM (TikTok Only)
 const tryTikWM = async (url) => {
     console.log('[GCP] Level 1: Trying TikWM...');
     try {
@@ -37,9 +36,7 @@ const tryTikWM = async (url) => {
         if (json.code === 0 && json.data) {
             return { title: json.data.title, thumbnail: json.data.cover, url: json.data.play, duration: json.data.duration, success: true };
         }
-    } catch (e) {
-        // Fallback to SnapTik logic later if needed
-    }
+    } catch (e) { }
     return null;
 };
 
@@ -56,20 +53,16 @@ const tryCobalt = async (url) => {
         'https://cobalt.dev',
         'https://api.cobalt.blackcloud.tk'
     ];
-    
-    // User Agents to mimic different browsers
     const uas = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
     ];
-
     for (const inst of instances) {
         console.log(`[GCP] Level 2: Trying -> ${inst}`);
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); 
-
             const res = await fetch(inst, {
                 method: 'POST',
                 headers: { 
@@ -81,13 +74,58 @@ const tryCobalt = async (url) => {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
-            
             const data = await res.json();
             if (data.url || data.stream) {
                 console.log(`[GCP] SUCCESS via ${inst}`);
                 return { title: 'Extracted Media', url: data.url || data.stream, success: true, duration: 30 };
             }
         } catch (e) { }
+    }
+    return null;
+};
+
+// BYPASS LAYER 4: AI Stealth Browser
+const { chromium } = require('playwright-extra');
+const stealth = require('stealth-playwright')();
+chromium.use(stealth);
+
+const tryPlaywright = async (url) => {
+    console.log('[GCP] Level 4: ACTIVATING STEALTH AI BROWSER...');
+    let browser;
+    try {
+        browser = await chromium.launch({ headless: true });
+        const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+        });
+        const page = await context.newPage();
+        
+        // Listen for video network requests
+        let videoUrl = null;
+        page.on('request', request => {
+            const reqUrl = request.url();
+            if (reqUrl.includes('.mp4') || reqUrl.includes('googlevideo.com/videoplayback') || reqUrl.includes('video.twimg.com')) {
+                videoUrl = reqUrl;
+            }
+        });
+
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+        
+        // If not found yet, wait a bit or try to find video tag
+        if (!videoUrl) {
+            videoUrl = await page.evaluate(() => {
+                const video = document.querySelector('video');
+                return video ? video.src : null;
+            });
+        }
+
+        if (videoUrl) {
+            console.log('[GCP] AI BROWSER SUCCESS!');
+            return { title: 'AI Extracted Media', url: videoUrl, success: true, duration: 30 };
+        }
+    } catch (e) {
+        console.log('[GCP] AI Browser failed:', e.message);
+    } finally {
+        if (browser) await browser.close();
     }
     return null;
 };
@@ -106,7 +144,7 @@ app.post('/resolve', async (req, res) => {
             result = await tryTikWM(finalUrl);
         }
 
-        // 2. Main Engine (yt-dlp) - try EVERY format if primary fails
+        // 2. Main Engine (yt-dlp)
         if (!result) {
             console.log('[GCP] Level 0: Main Engine (yt-dlp)...');
             try {
@@ -121,24 +159,25 @@ app.post('/resolve', async (req, res) => {
                 if (fs.existsSync(cookiePath)) options.cookies = cookiePath;
 
                 const info = await youtubedl(finalUrl, options);
-                
-                // Find best playable URL
                 let bestUrl = info.url;
                 if (!bestUrl && info.formats) {
                     const formats = info.formats.filter(f => f.url && f.vcodec !== 'none').sort((a,b) => (b.height || 0) - (a.height || 0));
                     if (formats.length > 0) bestUrl = formats[0].url;
                 }
-
-                if (bestUrl) {
-                    result = { title: info.title, thumbnail: info.thumbnail, url: bestUrl, duration: info.duration, success: true };
-                }
+                if (bestUrl) result = { title: info.title, thumbnail: info.thumbnail, url: bestUrl, duration: info.duration, success: true };
             } catch (e) { console.log('[GCP] Main Engine Blocked.'); }
         }
 
-        // 3. Fallback Rotation
+        // 3. Cobalt Fallback
         if (!result) {
-            console.log('[GCP] Main Engine Failed. ACTIVATING BYPASS ARMY...');
+            console.log('[GCP] Level 2: Activating Cobalt Rotation...');
             result = await tryCobalt(finalUrl);
+        }
+
+        // 4. THE MASTER FALLBACK: STEALTH AI BROWSER
+        if (!result) {
+            console.log('[GCP] Level 3: FAILED. DEPLOYING AI STEALTH BROWSER...');
+            result = await tryPlaywright(finalUrl);
         }
 
         // Final Response
@@ -150,14 +189,15 @@ app.post('/resolve', async (req, res) => {
                 streamUrl: `http://${host}:3001/stream?url=${encodeURIComponent(result.url)}`
             });
         } else {
-            console.error('[GCP] ALL METHODS FAILED.');
-            res.status(500).json({ error: 'Failed to extract video. The platform is currently blocking all access. Please try a different link.' });
+            console.error('[GCP] TOTAL SYSTEM FAILURE - PLATFORM IS UNREACHABLE');
+            res.status(500).json({ error: 'All extraction methods including AI Stealth failed. Platform is blocking all server requests.' });
         }
     } catch (err) {
         console.error('[GCP] Internal Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
+
 
 
 // Stream Proxy (Full Proxy for bypassing browser blocks)
