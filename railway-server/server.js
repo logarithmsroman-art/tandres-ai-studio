@@ -28,9 +28,9 @@ const expandUrl = (shortUrl) => {
     });
 };
 
-// FAST Fallbacks
+// BYPASS LAYER 1: TikWM (TikTok Only)
 const tryTikWM = async (url) => {
-    console.log('[GCP] Trying TikWM...');
+    console.log('[GCP] Level 1: Trying TikWM...');
     try {
         const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`);
         const json = await res.json();
@@ -41,15 +41,18 @@ const tryTikWM = async (url) => {
     return null;
 };
 
+// BYPASS LAYER 2: Cobalt Rotation (YouTube / Instagram / TikTok)
 const tryCobalt = async (url) => {
     const instances = [
         'https://api.cobalt.tools',
         'https://cobalt.qewertyy.dev',
+        'https://api.vxtwitter.com',
         'https://cobalt-api.zeit.top',
-        'https://api.vxtwitter.com'
+        'https://cobalt.hypernotion.net',
+        'https://cobalt.instatus.com'
     ];
     for (const inst of instances) {
-        console.log(`[GCP] Trying Cobalt Instance: ${inst}`);
+        console.log(`[GCP] Level 2: Trying Instance -> ${inst}`);
         try {
             const res = await fetch(inst, {
                 method: 'POST',
@@ -58,10 +61,10 @@ const tryCobalt = async (url) => {
             });
             const data = await res.json();
             if (data.url || data.stream) {
-                console.log(`[GCP] Cobalt Success via ${inst}`);
-                return { title: 'Video', url: data.url || data.stream, success: true, duration: 30 };
+                console.log(`[GCP] SUCCESS via ${inst}`);
+                return { title: 'Tandres Extracted Video', url: data.url || data.stream, success: true, duration: 30 };
             }
-        } catch (e) { console.log(`[GCP] Cobalt ${inst} failed`); }
+        } catch (e) { console.log(`[GCP] Instance ${inst} skipped`); }
     }
     return null;
 };
@@ -69,78 +72,70 @@ const tryCobalt = async (url) => {
 // Resolve Endpoint
 app.post('/resolve', async (req, res) => {
     const { url } = req.body;
-    console.log('\n--- NEW REQUEST ---');
-    console.log('[GCP] Processing:', url);
+    console.log('\n-----------------------------');
+    console.log('[GCP] INCOMING:', url);
     try {
         let finalUrl = await expandUrl(url);
         let result = null;
 
-        // Priority 1: TikWM for TikTok
+        // 1. TikTok Priority
         if (finalUrl.includes('tiktok.com')) {
             result = await tryTikWM(finalUrl);
         }
 
-        // Priority 2: yt-dlp with CORRECT cookie path
+        // 2. Main Extraction Engine (yt-dlp)
         if (!result) {
-            console.log('[GCP] Trying yt-dlp...');
+            console.log('[GCP] Running Main Engine (yt-dlp)...');
             try {
-                // Look for cookies in both possible locations
-                const cookiePaths = [
-                    path.join(__dirname, '..', 'cookie', 'www.youtube.com_cookies.txt'),
-                    path.join(process.cwd(), 'cookies.txt'),
-                    path.join(__dirname, 'cookies.txt')
-                ];
-                let activeCookie = null;
-                for (const p of cookiePaths) {
-                    if (fs.existsSync(p)) {
-                        activeCookie = p;
-                        console.log(`[GCP] Using cookies from: ${p}`);
-                        break;
-                    }
-                }
-
+                // Find cookies in GCP folder structure
+                const cookiePath = '/home/akindunbisulaiman00040/tandres-ai-studio/cookie/www.youtube.com_cookies.txt';
                 const options = {
                     dumpSingleJson: true, noWarnings: true,
-                    addHeader: ['User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
+                    addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
                 };
-                if (activeCookie) options.cookies = activeCookie;
+                if (fs.existsSync(cookiePath)) {
+                    console.log('[GCP] Found Cookies File!');
+                    options.cookies = cookiePath;
+                }
 
                 const info = await youtubedl(finalUrl, options);
                 result = { title: info.title, thumbnail: info.thumbnail, url: info.url, duration: info.duration, success: true };
-            } catch (e) { console.log('[GCP] yt-dlp failed:', e.message.substring(0, 100)); }
+            } catch (e) { 
+                console.log('[GCP] Main Engine Blocked (Rate Limited)');
+            }
         }
 
-        // Priority 3: Cobalt (The "Tank" method)
+        // 3. Fallback Rotation (The Tank)
         if (!result) {
-            console.log('[GCP] Falling back to Cobalt Rotation...');
+            console.log('[GCP] Main Engine Failed. ACTIVATING BYPASS ROTATION...');
             result = await tryCobalt(finalUrl);
         }
 
         if (result) {
-            console.log('[GCP] SUCCESS: Returning video data.');
+            console.log('[GCP] EXTRACTION SUCCESSFUL');
             const externalIp = '34.30.156.248';
             res.json({
                 ...result,
                 streamUrl: `http://${externalIp}:3001/stream?url=${encodeURIComponent(result.url)}`
             });
         } else {
-            console.error('[GCP] FATAL: All extraction methods failed.');
+            console.error('[GCP] ALL METHODS FAILED - Platform is likely under heavy protection.');
             res.status(500).json({ error: 'All extraction methods failed' });
         }
     } catch (err) {
-        console.error('[GCP] Error in resolve:', err.message);
+        console.error('[GCP] System Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Stream Proxy
+// Stream Proxy (Redirect only for speed)
 app.get('/stream', async (req, res) => {
-    const { url } = req.query;
-    if (!url) return res.status(400).send('No URL');
-    res.redirect(url); 
+    if (!req.query.url) return res.status(400).send('No URL');
+    res.redirect(req.query.url); 
 });
 
-app.listen(PORT, () => console.log(`🚀 Dedicated Extractor running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Dedicated Extractor PRO UNLOCKED on port ${PORT}`));
+
 
 
 
