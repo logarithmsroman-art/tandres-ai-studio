@@ -37,11 +37,12 @@ const tryTikWM = async (url) => {
         if (json.code === 0 && json.data) {
             return { title: json.data.title, thumbnail: json.data.cover, url: json.data.play, duration: json.data.duration, success: true };
         }
-    } catch (e) { console.log('[GCP] TikWM fail'); }
+    } catch (e) {
+        // Fallback to SnapTik logic later if needed
+    }
     return null;
 };
 
-// BYPASS LAYER 2: Cobalt Rotation (YouTube / Instagram / TikTok)
 const tryCobalt = async (url) => {
     const instances = [
         'https://api.cobalt.tools',
@@ -53,19 +54,29 @@ const tryCobalt = async (url) => {
         'https://cobalt.draco.sh',
         'https://cobalt.peroxaan.com',
         'https://cobalt.dev',
-        'https://api.cobalt.blackcloud.tk',
-        'https://cobalt.vps.net',
-        'https://api.cobalt.cool'
+        'https://api.cobalt.blackcloud.tk'
     ];
+    
+    // User Agents to mimic different browsers
+    const uas = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    ];
+
     for (const inst of instances) {
         console.log(`[GCP] Level 2: Trying -> ${inst}`);
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 sec timeout per instance
+            const timeoutId = setTimeout(() => controller.abort(), 10000); 
 
             const res = await fetch(inst, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Accept': 'application/json',
+                    'User-Agent': uas[Math.floor(Math.random() * uas.length)]
+                },
                 body: JSON.stringify({ url, videoQuality: '720', filenameStyle: 'basic' }),
                 signal: controller.signal
             });
@@ -74,11 +85,9 @@ const tryCobalt = async (url) => {
             const data = await res.json();
             if (data.url || data.stream) {
                 console.log(`[GCP] SUCCESS via ${inst}`);
-                return { title: 'Tandres Extracted Video', url: data.url || data.stream, success: true, duration: 30 };
+                return { title: 'Extracted Media', url: data.url || data.stream, success: true, duration: 30 };
             }
-        } catch (e) { 
-            console.log(`[GCP] Instance ${inst} failed/timed out`); 
-        }
+        } catch (e) { }
     }
     return null;
 };
@@ -92,45 +101,47 @@ app.post('/resolve', async (req, res) => {
         let finalUrl = await expandUrl(url);
         let result = null;
 
-        // 1. TikTok Priority
+        // 1. TikTok Logic
         if (finalUrl.includes('tiktok.com')) {
             result = await tryTikWM(finalUrl);
         }
 
-        // 2. Main Extraction Engine (yt-dlp)
+        // 2. Main Engine (yt-dlp) - try EVERY format if primary fails
         if (!result) {
-            console.log('[GCP] Running Main Engine (yt-dlp)...');
+            console.log('[GCP] Level 0: Main Engine (yt-dlp)...');
             try {
-                // Find cookies in GCP folder structure
-                const cookiePath = '/home/akindunbisulaiman00040/tandres-ai-studio/cookie/www.youtube.com_cookies.txt';
+                const cookiePath = fs.existsSync('/home/akindunbisulaiman00040/tandres-ai-studio/cookies.txt') 
+                    ? '/home/akindunbisulaiman00040/tandres-ai-studio/cookies.txt' 
+                    : '/home/akindunbisulaiman00040/tandres-ai-studio/cookie/www.youtube.com_cookies.txt';
+                
                 const options = {
                     dumpSingleJson: true, noWarnings: true,
-                    addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
+                    addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36']
                 };
-                if (fs.existsSync(cookiePath)) {
-                    console.log('[GCP] Found Cookies File!');
-                    options.cookies = cookiePath;
-                }
+                if (fs.existsSync(cookiePath)) options.cookies = cookiePath;
 
                 const info = await youtubedl(finalUrl, options);
-                result = { title: info.title, thumbnail: info.thumbnail, url: info.url, duration: info.duration, success: true };
-            } catch (e) { 
-                console.log('[GCP] Main Engine Blocked (Rate Limited)');
-            }
+                
+                // Find best playable URL
+                let bestUrl = info.url;
+                if (!bestUrl && info.formats) {
+                    const formats = info.formats.filter(f => f.url && f.vcodec !== 'none').sort((a,b) => (b.height || 0) - (a.height || 0));
+                    if (formats.length > 0) bestUrl = formats[0].url;
+                }
+
+                if (bestUrl) {
+                    result = { title: info.title, thumbnail: info.thumbnail, url: bestUrl, duration: info.duration, success: true };
+                }
+            } catch (e) { console.log('[GCP] Main Engine Blocked.'); }
         }
 
-        // 3. Fallback Rotation (The Tank)
+        // 3. Fallback Rotation
         if (!result) {
-            console.log('[GCP] Main Engine Failed. ACTIVATING BYPASS ROTATION...');
+            console.log('[GCP] Main Engine Failed. ACTIVATING BYPASS ARMY...');
             result = await tryCobalt(finalUrl);
         }
 
-        // Final Safety: Ensure we have a URL
-        if (result && !result.url && result.formats) {
-            const bestFormat = result.formats.find(f => f.url);
-            if (bestFormat) result.url = bestFormat.url;
-        }
-
+        // Final Response
         if (result && result.url) {
             console.log('[GCP] EXTRACTION SUCCESSFUL');
             const host = req.headers.host ? req.headers.host.split(':')[0] : '34.30.156.248';
@@ -139,14 +150,15 @@ app.post('/resolve', async (req, res) => {
                 streamUrl: `http://${host}:3001/stream?url=${encodeURIComponent(result.url)}`
             });
         } else {
-            console.error('[GCP] ALL METHODS FAILED - Platform is likely under heavy protection.');
-            res.status(500).json({ error: 'All extraction methods failed' });
+            console.error('[GCP] ALL METHODS FAILED.');
+            res.status(500).json({ error: 'Failed to extract video. The platform is currently blocking all access. Please try a different link.' });
         }
     } catch (err) {
-        console.error('[GCP] System Error:', err.message);
+        console.error('[GCP] Internal Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
+
 
 // Stream Proxy (Full Proxy for bypassing browser blocks)
 app.get('/stream', async (req, res) => {
