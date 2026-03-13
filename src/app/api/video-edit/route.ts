@@ -117,61 +117,27 @@ export async function POST(req: NextRequest) {
                 const isTikTok = url.includes('tiktok.com') || url.includes('vt.tiktok.com');
                 let ytDlpError = '';
                 try {
-                    if (!isLocal && railwayUrl) {
+                    if (railwayUrl) {
                         const res = await fetch(`${railwayUrl}/resolve`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ url }),
-                            signal: AbortSignal.timeout(15000)
+                            signal: AbortSignal.timeout(25000)
                         });
                         const data = await res.json();
-                        if (!data.success) {
-                            ytDlpError = data.error || 'Resolution failed';
-                            throw new Error(ytDlpError);
-                        }
-                        mediaInfo = data;
-                    } else {
-                        const ytDlpOptions: any = {
-                            dumpSingleJson: true,
-                            noWarnings: true,
-                            addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36']
-                        };
-                        const cookiesPath = path.join(process.cwd(), 'cookies.txt');
-                        if (fs.existsSync(cookiesPath)) {
-                            ytDlpOptions.cookies = cookiesPath;
-                        }
-                        mediaInfo = await youtubedl(url, ytDlpOptions);
-                        mediaInfo = {
-                            title: mediaInfo.title,
-                            thumbnail: mediaInfo.thumbnail,
-                            rawUrl: mediaInfo.url,
-                            duration: mediaInfo.duration,
-                            formats: mediaInfo.formats
-                        };
-                    }
-                } catch (e: any) {
-                    // FALLBACK BLOCK: If yt-dlp fails, use bypass APIs
-                    if (isTikTok) {
-                        const bypassRes = await fetch(`https://tikwm.com/api/?url=${url}`);
-                        const bypassData = await bypassRes.json();
-                        if (bypassData.code === 0 && bypassData.data) {
-                            const d = bypassData.data;
-                            mediaInfo = {
-                                title: d.title || 'TikTok Video',
-                                thumbnail: d.cover,
-                                rawUrl: d.play || d.wmplay,
-                                duration: d.duration,
-                                formats: [{ url: d.play || d.wmplay, ext: 'mp4', note: 'HD' }]
-                            };
-                            if (d.music) {
-                                mediaInfo.formats.push({ url: d.music, ext: 'mp3', note: 'Audio' });
-                            }
+                        if (data.success) {
+                            mediaInfo = data;
                         } else {
-                            throw new Error(ytDlpError || e.message);
+                            throw new Error(data.error || 'Server error');
                         }
                     } else {
-                        throw new Error(ytDlpError || e.message);
+                        const youtubedl = require('youtube-dl-exec').default || require('youtube-dl-exec');
+                        const info = await youtubedl(url, { dumpSingleJson: true, noWarnings: true });
+                        mediaInfo = { success: true, title: info.title, duration: info.duration, thumbnail: info.thumbnail, formats: info.formats };
                     }
+                } catch (err: any) {
+                    console.error('Final Extraction Failure:', err.message);
+                    throw new Error(`COULD NOT RESOLVE VIDEO: ${err.message}`);
                 }
 
                 const duration = Number(mediaInfo.duration) || 0;
