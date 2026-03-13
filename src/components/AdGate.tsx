@@ -153,24 +153,32 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                                 </div>
                             </div>
                         ) : status === 'playing' ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-6 p-12">
-                                <div className="h-20 w-20 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-900/40 border border-white/10">
-                                    <Sparkles className="w-10 h-10 text-white" />
-                                </div>
-                                <div className="text-center space-y-2">
-                                    <h3 className="text-2xl font-black tracking-tight uppercase italic text-purple-400 animate-pulse">Ad Processing...</h3>
-                                    <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em]">Stay on this page while the ad finishes</p>
-                                </div>
-                                <div className="w-64 h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                    <motion.div
-                                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
-                                        initial={{ width: "0%" }}
-                                        animate={{ width: "100%" }}
-                                        transition={{ duration: 15, ease: "linear" }}
-                                    />
-                                </div>
-                                <div className="mt-8 px-8 py-3 bg-white/5 border border-white/10 rounded-2xl text-[9px] font-black uppercase tracking-widest text-white/30 text-center max-w-xs">
-                                    Verification will complete automatically.
+                            <div className="w-full h-full relative">
+                                {/* Real Ad Iframe Embed */}
+                                <iframe 
+                                    src={MONETAG_DIRECT_LINK}
+                                    className="w-full h-full min-h-[400px] border-0 rounded-b-[2rem]"
+                                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
+                                    sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
+                                />
+                                
+                                {/* Overlay Timer Bar */}
+                                <div className="absolute bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-md border-t border-white/5">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-ping" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-purple-400">Verifying your view...</span>
+                                        </div>
+                                        <span className="text-[10px] font-black text-white/40">{timeLeft}s</span>
+                                    </div>
+                                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                        <motion.div
+                                            className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
+                                            initial={{ width: "0%" }}
+                                            animate={{ width: "100%" }}
+                                            transition={{ duration: 15, ease: "linear" }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         ) : (
