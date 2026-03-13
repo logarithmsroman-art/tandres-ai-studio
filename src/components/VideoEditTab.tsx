@@ -11,6 +11,7 @@ import {
     Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft, Crown
 } from 'lucide-react';
 import AdGate from './AdGate';
+import AdBanner from './AdBanner';
 import LabSubscriptions from './LabSubscriptions';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -35,6 +36,7 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
     const [showAd, setShowAd] = useState(false);
     const [profile, setProfile] = useState<any>(null);
     const [isSpending, setIsSpending] = useState(false);
+    const [systemLocks, setSystemLocks] = useState<any[]>([]);
 
     // Inputs
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -167,6 +169,14 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
 
     const resolveUrl = async () => {
         if (!pastedUrl) return;
+
+        // Check for locks
+        const lockId = currentTool === 'audio-extractor' ? 'audio_link' : 'video_link';
+        const lock = systemLocks.find(l => l.id === lockId);
+        if (lock?.is_locked) {
+            setError(lock.lock_message || "This tool is under maintenance.");
+            return;
+        }
 
         if (pastedUrl.includes('tiktok.com') && pastedUrl.includes('/photo/')) {
             setError("TikTok Photo Slideshows are not supported yet. Please use a Video link.");
@@ -375,28 +385,48 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
     const runEngine = async () => {
         const hasInput = selectedFiles.length > 0 || (resolvedInfo && resolvedInfo.url) || joinerTracks.length > 0;
         if (!hasInput || !loaded) return;
+        if (!userId) {
+            setError("Please login to process.");
+            return;
+        }
 
         setOutputAudioUrl(null);
 
-        // Ad Gate Business Logic
+        // 1. Check System Locks (The "Kill Switch")
+        try {
+            const { data: locks } = await supabase.from('system_locks').select('*');
+            const toolId = currentTool === 'audio-extractor' ? (selectedFiles.length > 0 ? 'audio_upload' : 'audio_link') : 
+                          currentTool === 'video-extractor' ? 'video_link' : 
+                          currentTool === 'trimmer' ? 'audio_trimmer' :
+                          currentTool === 'joiner' ? 'audio_joiner' :
+                          currentTool.replace('-', '_');
+            
+            const toolLock = locks?.find(l => l.id === toolId);
+            if (toolLock?.is_locked) {
+                setError(toolLock.lock_message || "This tool is under maintenance.");
+                return;
+            }
+        } catch (e) {
+            console.warn("Lock check failed, proceeding with caution.");
+        }
+
+        // 2. Optimized Ad Logic (No more constant redirects)
         if (profile?.subscription_tier === 'free') {
             if ((profile?.free_credits || 0) > 0) {
                 setIsSpending(true);
                 try {
-                    const res = await fetch('/api/free-credits', {
+                    await fetch('/api/free-credits', {
                         method: 'POST',
                         body: JSON.stringify({ userId, action: 'spend' })
                     });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'Failed to spend credit');
                     fetchProfile();
+                    executeEngine();
                 } catch (e: any) {
                     setError(e.message);
-                    setIsSpending(false);
-                    return;
                 } finally {
                     setIsSpending(false);
                 }
+                return;
             } else {
                 setShowAd(true);
                 return;
@@ -511,9 +541,15 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
         }
     };
 
+    const fetchLocks = async () => {
+        const { data } = await supabase.from('system_locks').select('*');
+        if (data) setSystemLocks(data);
+    };
+
     useEffect(() => {
         load();
         fetchProfile();
+        fetchLocks();
     }, [userId]);
 
     const tools = [
@@ -946,6 +982,7 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
 
                     {/* Right Panel: Output & Live Preview */}
                     <div className="xl:col-span-4 space-y-6">
+                        <AdBanner />
                         <section className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8 space-y-6">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Live Workspace</h3>
 

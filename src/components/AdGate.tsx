@@ -143,7 +143,7 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
                                         onClick={() => {
-                                            window.open(MONETAG_DIRECT_LINK, '_blank');
+                                            // window.open(MONETAG_DIRECT_LINK, '_blank'); 
                                             setStatus('playing');
                                         }}
                                         className="mt-6 px-10 py-4 bg-white text-black text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-purple-50 transition-all shadow-xl shadow-white/10"
