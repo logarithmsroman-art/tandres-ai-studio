@@ -86,7 +86,7 @@ const tryCobalt = async (url) => {
 
 // BYPASS LAYER 4: AI Stealth Browser
 const { chromium } = require('playwright-extra');
-const stealth = require('stealth-playwright')();
+const stealth = require('playwright-stealth')();
 chromium.use(stealth);
 
 const tryPlaywright = async (url) => {
