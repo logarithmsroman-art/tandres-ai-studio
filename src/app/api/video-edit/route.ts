@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
                     title: mediaInfo.title,
                     thumbnail: mediaInfo.thumbnail,
                     streamUrl: mediaInfo.streamUrl || mediaInfo.url, // Trust the server's calculated streamUrl
-                    duration: duration,
+                    duration: mediaInfo.duration || duration,
                     isTikTokFallback,
                     formats: mediaInfo.formats?.filter((f: any) => f.url).map((f: any) => ({
                         url: f.url,

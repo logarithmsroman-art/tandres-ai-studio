@@ -431,8 +431,11 @@ export default function VideoEditTab({ userId, onSuccess }: { userId?: string, o
                     const alreadyWrapped = workerUrl && urlStr.startsWith(workerUrl);
 
                     let fetchUrl = '';
-                    if (urlStr.startsWith('/api/')) {
-                        // Already a server-side route (serve-media, tunnel, proxy etc)
+                    // Detect if the URL is already pointing to our GCP server or a proxy bypass
+                    const isAlreadyProxied = urlStr.includes(':3001/stream') || urlStr.includes('tikwm.com') || urlStr.includes('cobalt');
+
+                    if (urlStr.startsWith('/api/') || isAlreadyProxied) {
+                        // Already a server-side route or a bypass link - fetch directly
                         fetchUrl = urlStr;
                     } else if (urlStr.startsWith('/downloads')) {
                         fetchUrl = `/api/serve-media?file=${encodeURIComponent(urlStr)}`;

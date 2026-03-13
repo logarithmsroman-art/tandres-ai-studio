@@ -113,10 +113,10 @@ app.post('/resolve', async (req, res) => {
 
         if (result) {
             console.log('[GCP] EXTRACTION SUCCESSFUL');
-            const externalIp = '34.30.156.248';
+            const host = req.headers.host ? req.headers.host.split(':')[0] : '34.30.156.248';
             res.json({
                 ...result,
-                streamUrl: `http://${externalIp}:3001/stream?url=${encodeURIComponent(result.url)}`
+                streamUrl: `http://${host}:3001/stream?url=${encodeURIComponent(result.url)}`
             });
         } else {
             console.error('[GCP] ALL METHODS FAILED - Platform is likely under heavy protection.');
