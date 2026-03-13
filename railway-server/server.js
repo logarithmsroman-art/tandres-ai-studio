@@ -16,15 +16,22 @@ app.use(express.json());
 
 // Helper to expand shortlinks
 const expandUrl = (shortUrl) => {
+    if (!shortUrl || typeof shortUrl !== 'string' || !shortUrl.startsWith('http')) {
+        return Promise.resolve(shortUrl);
+    }
     return new Promise((resolve) => {
         const client = shortUrl.startsWith('https') ? https : http;
-        client.get(shortUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1' }
-        }, (res) => {
-            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                resolve(res.headers.location);
-            } else { resolve(shortUrl); }
-        }).on('error', () => resolve(shortUrl));
+        try {
+            client.get(shortUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1' }
+            }, (res) => {
+                if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                    resolve(res.headers.location);
+                } else { resolve(shortUrl); }
+            }).on('error', () => resolve(shortUrl));
+        } catch (e) {
+            resolve(shortUrl);
+        }
     });
 };
 
@@ -86,8 +93,8 @@ const tryCobalt = async (url) => {
 
 // BYPASS LAYER 4: AI Stealth Browser
 const { chromium } = require('playwright-extra');
-const stealth = require('playwright-stealth')();
-chromium.use(stealth);
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+chromium.use(StealthPlugin());
 
 const tryPlaywright = async (url) => {
     console.log('[GCP] Level 4: ACTIVATING STEALTH AI BROWSER...');
