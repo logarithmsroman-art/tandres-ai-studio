@@ -206,9 +206,10 @@ export async function POST(req: NextRequest) {
                 const workerUrl = process.env.NEXT_PUBLIC_WORKER_URL || '';
                 const makeProxyUrl = (targetUrl: string) => {
                     if (!targetUrl) return '';
-                    // Only use Railway stream proxy if the URL is a TikTok PAGE URL, not a direct mp4 CDN link
+                    // Use GCP stream proxy for TikTok page URLs, but wrapped in HTTPS via our own proxy
                     if (isTikTok && (targetUrl.includes('tiktok.com/@') || targetUrl.includes('vt.tiktok.com'))) {
-                        return `${railwayUrl}/api/stream?url=${encodeURIComponent(targetUrl)}`;
+                        const directStream = `${railwayUrl}/api/stream?url=${encodeURIComponent(targetUrl)}`;
+                        return workerUrl ? `${workerUrl}?url=${encodeURIComponent(directStream)}` : `/api/proxy?url=${encodeURIComponent(directStream)}`;
                     }
                     return workerUrl ? `${workerUrl}?url=${encodeURIComponent(targetUrl)}` : `/api/proxy?url=${encodeURIComponent(targetUrl)}`;
                 };
