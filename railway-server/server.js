@@ -128,13 +128,48 @@ app.post('/resolve', async (req, res) => {
     }
 });
 
-// Stream Proxy (Redirect only for speed)
+// Stream Proxy (Full Proxy for bypassing browser blocks)
 app.get('/stream', async (req, res) => {
-    if (!req.query.url) return res.status(400).send('No URL');
-    res.redirect(req.query.url); 
+    const videoUrl = req.query.url;
+    if (!videoUrl) return res.status(400).send('No URL');
+
+    console.log('[GCP] Proxying Stream for:', videoUrl.substring(0, 50));
+
+    const isTikTok = videoUrl.includes('tiktok') || videoUrl.includes('tikwm');
+    const isYouTube = videoUrl.includes('googlevideo') || videoUrl.includes('youtube');
+
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Referer': isTikTok ? 'https://www.tiktok.com/' : (isYouTube ? 'https://www.youtube.com/' : 'https://www.instagram.com/')
+    };
+
+    // Forward the 'Range' header to support video seeking (scrubbing thru the video)
+    if (req.headers.range) {
+        headers['Range'] = req.headers.range;
+    }
+
+    const client = videoUrl.startsWith('https') ? https : http;
+
+    client.get(videoUrl, { headers }, (proxyRes) => {
+        // Forward essential headers
+        if (proxyRes.statusCode === 206) res.status(206);
+        else res.status(proxyRes.statusCode);
+
+        res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'video/mp4');
+        if (proxyRes.headers['content-length']) res.setHeader('Content-Length', proxyRes.headers['content-length']);
+        if (proxyRes.headers['content-range']) res.setHeader('Content-Range', proxyRes.headers['content-range']);
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        proxyRes.pipe(res);
+    }).on('error', (err) => {
+        console.error('[GCP] Proxy Error:', err.message);
+        res.status(500).send('Stream error');
+    });
 });
 
 app.listen(PORT, () => console.log(`🚀 Dedicated Extractor PRO UNLOCKED on port ${PORT}`));
+
 
 
 
