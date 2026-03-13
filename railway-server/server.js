@@ -46,25 +46,39 @@ const tryCobalt = async (url) => {
     const instances = [
         'https://api.cobalt.tools',
         'https://cobalt.qewertyy.dev',
+        'https://cobalt.hypernotion.net',
         'https://api.vxtwitter.com',
         'https://cobalt-api.zeit.top',
-        'https://cobalt.hypernotion.net',
-        'https://cobalt.instatus.com'
+        'https://cobalt.instatus.com',
+        'https://cobalt.draco.sh',
+        'https://cobalt.peroxaan.com',
+        'https://cobalt.dev',
+        'https://api.cobalt.blackcloud.tk',
+        'https://cobalt.vps.net',
+        'https://api.cobalt.cool'
     ];
     for (const inst of instances) {
-        console.log(`[GCP] Level 2: Trying Instance -> ${inst}`);
+        console.log(`[GCP] Level 2: Trying -> ${inst}`);
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 sec timeout per instance
+
             const res = await fetch(inst, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ url, videoQuality: '720', filenameStyle: 'basic' })
+                body: JSON.stringify({ url, videoQuality: '720', filenameStyle: 'basic' }),
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
+            
             const data = await res.json();
             if (data.url || data.stream) {
                 console.log(`[GCP] SUCCESS via ${inst}`);
                 return { title: 'Tandres Extracted Video', url: data.url || data.stream, success: true, duration: 30 };
             }
-        } catch (e) { console.log(`[GCP] Instance ${inst} skipped`); }
+        } catch (e) { 
+            console.log(`[GCP] Instance ${inst} failed/timed out`); 
+        }
     }
     return null;
 };
