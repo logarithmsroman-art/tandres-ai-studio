@@ -26,18 +26,9 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
 
     useEffect(() => {
         if (isOpen) {
-            // Trigger the native Monetag Vignette/Interstitial instantly
-            try {
-                // @ts-ignore
-                if (window.show_8854045) { // Common Monetag trigger function
-                    // @ts-ignore
-                    window.show_8854045();
-                }
-            } catch (e) {
-                console.warn("Native ad trigger failed, falling back to wait-state.");
-            }
+            // MultiTag handles ad rotation automatically. We provide the wait-gate.
             setStatus('playing');
-            setTimeLeft(10); // Native ads are usually 10s
+            setTimeLeft(10); 
         }
     }, [isOpen]);
 
@@ -82,7 +73,6 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                     exit={{ opacity: 0, y: 50 }}
                     className="relative w-full max-w-md bg-[#0a0a0a]/90 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl pointer-events-auto"
                 >
-                    {/* Minimal Hub while Native Ad plays */}
                     <div className="p-8 text-center space-y-6">
                         <div className="flex items-center justify-center gap-3">
                             <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
