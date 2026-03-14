@@ -26,9 +26,13 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
     const VAST_URL = "https://necessary-jury.com/dLm.F0zidlgDNcv/ZXGYUI/GeNmt9AuXZKUrlYkiP/TCYb4vN/jckE5UM/T/cpt_NBjLgg2COLTBkNypM0Qj";
 
     useEffect(() => {
-        if (isOpen && videoRef.current && typeof window.fluidPlayer !== 'undefined') {
-            // Wait a tiny bit for the DOM to settle
-            const timer = setTimeout(() => {
+        let retryCount = 0;
+        const maxRetries = 50; // 5 seconds total
+        let initInterval: NodeJS.Timeout;
+
+        const initPlayer = () => {
+            if (typeof window.fluidPlayer !== 'undefined' && videoRef.current) {
+                clearInterval(initInterval);
                 try {
                     playerInstance.current = window.fluidPlayer(videoRef.current, {
                         layoutControls: {
@@ -38,59 +42,67 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                             playbackRateControl: false,
                             playPauseAnimation: true,
                             autoPlay: true,
-                            mute: false,
+                            mute: true, // Crucial for browser-autoplay policies
                             logo: {
                                 imageUrl: '/logo.png',
                                 clickUrl: 'https://tandresai.online',
                                 position: 'top left',
                                 opacity: 0.5
                             },
-                            controlBar: {
-                                autoHide: true,
-                                animated: true
-                            }
                         },
                         vastOptions: {
                             adList: [
                                 {
                                     roll: 'preRoll',
-                                    vastTagLoad: (vastTag: string) => vastTag, // Just return the URL
                                     vastTag: VAST_URL
                                 }
                             ],
                             adFinishedCallback: () => {
-                                console.log("Ad finished");
                                 setAdCompleted(true);
                                 onComplete();
                                 onClose();
                             },
-                            adErrorCallback: (error: any) => {
-                                console.error("Ad Error:", error);
-                                setError("Commercial failed to load. Please try again.");
-                                // Fallback: allow them through if it's a persistent error
+                            adErrorCallback: (err: any) => {
+                                console.error("VAST Error:", err);
+                                setError("Commercial unavailable. Unlocking tool...");
                                 setTimeout(() => {
                                     onComplete();
                                     onClose();
-                                }, 3000);
+                                }, 2000);
                             }
                         }
                     });
                 } catch (e) {
-                    console.error("Fluid Player Init Error:", e);
-                    setError("Player initialization failed.");
+                    console.error("Fluid Player Init Exception:", e);
+                    setError("Player failed to start.");
                 }
-            }, 100);
+            } else {
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    clearInterval(initInterval);
+                    setError("Connection timed out. Please refresh.");
+                    // Emergency fallback: allow them to use the tool if the ad network is down
+                    setTimeout(() => {
+                        onComplete();
+                        onClose();
+                    }, 3000);
+                }
+            }
+        };
 
-            return () => {
-                clearTimeout(timer);
-                if (playerInstance.current) {
-                    try {
-                        playerInstance.current.destroy();
-                    } catch (e) {}
-                }
-            };
+        if (isOpen) {
+            initInterval = setInterval(initPlayer, 100);
         }
-    }, [isOpen, onComplete, onClose]);
+
+        return () => {
+            if (initInterval) clearInterval(initInterval);
+            if (playerInstance.current) {
+                try {
+                    playerInstance.current.destroy();
+                } catch (e) {}
+            }
+        };
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -149,11 +161,37 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                         <source src="/placeholder_video.mp4" type="video/mp4" />
                     </video>
 
-                    {/* Pre-load message */}
+                    {/* Pre-load message & Stuck Fallback */}
                     {!playerInstance.current && !error && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-0">
-                            <Play className="w-16 h-16 text-purple-500/20 animate-pulse mb-4" />
-                            <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Establishing Studio Connection...</p>
+                            <motion.div
+                                animate={{ scale: [1, 1.1, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="mb-4"
+                            >
+                                <Play className="w-16 h-16 text-purple-500/20" />
+                            </motion.div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-white/20 mb-6">Establishing Studio Connection...</p>
+                            
+                            {/* If it takes more than 3 seconds, show a manual start button */}
+                            <motion.button
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 3 }}
+                                onClick={() => {
+                                    // Try one final aggressive init
+                                    if (typeof window.fluidPlayer !== 'undefined' && videoRef.current) {
+                                        window.fluidPlayer(videoRef.current, { /* same options as above */ });
+                                    } else {
+                                        // If all fails, let them in
+                                        onComplete();
+                                        onClose();
+                                    }
+                                }}
+                                className="px-6 py-2 bg-purple-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-purple-400 transition-all border border-purple-400/20"
+                            >
+                                Tap to Force Unlock
+                            </motion.button>
                         </div>
                     )}
                 </motion.div>

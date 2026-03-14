@@ -33,8 +33,11 @@ export default function RootLayout({
       <head>
         <meta name="f2110ff8b7e09f689d7c62b6eafa38a0be90efcf" content="f2110ff8b7e09f689d7c62b6eafa38a0be90efcf" />
         <link rel="stylesheet" href="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.css" type="text/css" />
-        <script src="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.js"></script>
       </head>
+      <Script 
+        src="https://cdn.fluidplayer.com/v3/current/fluidplayer.min.js"
+        strategy="beforeInteractive"
+      />
       <body
         className={`${inter.variable} ${outfit.variable} antialiased`}
       >
