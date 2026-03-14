@@ -995,7 +995,7 @@ export default function VideoEditTab({
 
                     {/* Right Panel: Output & Live Preview */}
                     <div className="xl:col-span-4 space-y-6">
-                        {/* No more static side banners - focusing on Video Popup only */}
+                        {profile?.subscription_tier === 'free' && <AdBanner />}
                         <section className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8 space-y-6">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Live Workspace</h3>
 
