@@ -421,10 +421,11 @@ export default function VideoEditTab({
         }
 
         // 2. Optimized Ad Logic (Strict check for Free Tier)
-        const isPremium = profile?.subscription_tier && profile.subscription_tier !== 'free';
+        const isFree = !profile?.subscription_tier || profile.subscription_tier === 'free';
 
-        if (!isPremium) {
-            if ((profile?.free_credits || 0) > 0) {
+        if (isFree) {
+            const silverCredits = profile?.free_credits || 0;
+            if (silverCredits > 0) {
                 setIsSpending(true);
                 try {
                     await fetch('/api/free-credits', {
@@ -994,7 +995,7 @@ export default function VideoEditTab({
 
                     {/* Right Panel: Output & Live Preview */}
                     <div className="xl:col-span-4 space-y-6">
-                        {profile?.subscription_tier === 'free' && <AdBanner />}
+                        {/* No more static side banners - focusing on Video Popup only */}
                         <section className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8 space-y-6">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Live Workspace</h3>
 

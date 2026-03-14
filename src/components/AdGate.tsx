@@ -34,12 +34,13 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                 // 1. Initial Loading
                 await new Promise(r => setTimeout(r, 1200));
 
-                // 2. Optimizing for Nigeria (Fallback logic visualization)
+                // 2. Optimizing for Nigeria
                 setStatus('optimizing');
-                await new Promise(r => setTimeout(r, 1800));
+                await new Promise(r => setTimeout(r, 1200));
 
-                // 3. Trigger Ad
-                setStatus('waiting');
+                // 3. Start Video Automatically
+                setStatus('playing');
+                window.open(MONETAG_DIRECT_LINK, '_blank');
             };
 
             loadAd();
@@ -155,35 +156,40 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                             </div>
                         ) : status === 'playing' ? (
                             <div className="w-full flex flex-col items-center justify-center min-h-[400px] bg-black relative overflow-hidden">
-                                {/* The "On-Page" Video Ad */}
+                                {/* The Advertisement Content */}
+                                <div className="absolute inset-x-0 top-0 p-6 z-20 flex justify-between items-start">
+                                    <div className="px-3 py-1 bg-purple-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-xl flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                                        Advertisement
+                                    </div>
+                                    <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-lg border border-white/5 text-white/40 text-[10px] font-black tracking-widest">
+                                        REWARD IN {timeLeft}S
+                                    </div>
+                                </div>
+
                                 <video 
                                     src="https://assets.mixkit.co/videos/preview/mixkit-abstract-technology-connection-loop-752-panel-720.mp4"
                                     autoPlay
                                     muted
                                     loop
-                                    className="absolute inset-0 w-full h-full object-cover opacity-60"
+                                    playsInline
+                                    className="absolute inset-0 w-full h-full object-cover opacity-80"
                                 />
 
                                 {/* Cinema Overlay */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black" />
                                 
-                                <div className="relative z-10 flex flex-col items-center text-center gap-6 w-full px-12 pb-12">
-                                    <div className="flex flex-col items-center gap-2">
-                                        <div className="px-4 py-1.5 bg-purple-500 text-white text-[8px] font-black uppercase tracking-[0.3em] rounded-full shadow-lg">
-                                            Sponsored Content
-                                        </div>
-                                        <h3 className="text-2xl font-black tracking-tight uppercase italic text-white/90">Studio Verification</h3>
+                                <div className="relative z-10 flex flex-col items-center text-center gap-8 w-full px-12 mt-auto pb-12">
+                                    <div className="space-y-2">
+                                        <h3 className="text-3xl font-black tracking-tight uppercase italic text-white drop-shadow-2xl">Studio Access Verification</h3>
+                                        <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em]">Optimizing your payout session...</p>
                                     </div>
 
                                     {/* Video Progress Bar */}
-                                    <div className="w-full space-y-3 mt-auto">
-                                        <div className="flex justify-between items-end text-[9px] font-black uppercase tracking-widest">
-                                            <span className="text-purple-400">Verifying view...</span>
-                                            <span className="text-white/40">{timeLeft}s</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden backdrop-blur-md">
+                                    <div className="w-full space-y-3">
+                                        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden backdrop-blur-md border border-white/5">
                                             <motion.div
-                                                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 shadow-[0_0_20px_rgba(168,85,247,0.5)]"
+                                                className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.6)]"
                                                 initial={{ width: "0%" }}
                                                 animate={{ width: "100%" }}
                                                 transition={{ duration: 15, ease: "linear" }}
@@ -191,8 +197,9 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                                         </div>
                                     </div>
 
-                                    <div className="text-[8px] font-bold text-white/20 uppercase tracking-[0.4em] animate-pulse">
-                                        Keep focused on this page to unlock
+                                    <div className="text-[9px] font-bold text-white/30 uppercase tracking-[0.4em] flex items-center gap-2">
+                                        <Loader2 className="w-3 h-3 animate-spin text-purple-500" />
+                                        Secure Stream Active
                                     </div>
                                 </div>
                             </div>
