@@ -68,34 +68,28 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[100] flex items-end justify-center pb-20 p-4 pointer-events-none">
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/95 backdrop-blur-3xl"
+                    className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
                 />
 
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative w-full max-w-xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(168,85,247,0.1)]"
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 50 }}
+                    className="relative w-full max-w-md bg-[#0a0a0a]/90 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl pointer-events-auto"
                 >
-                    {/* Simplified Hub while Native Ad plays in front */}
-                    <div className="p-12 text-center space-y-8">
-                        <div className="w-20 h-20 bg-purple-500/10 rounded-full border border-purple-500/20 flex items-center justify-center mx-auto">
-                            <Zap className="w-10 h-10 text-purple-400 animate-pulse" />
+                    {/* Minimal Hub while Native Ad plays */}
+                    <div className="p-8 text-center space-y-6">
+                        <div className="flex items-center justify-center gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                            <h3 className="text-sm font-black tracking-tight uppercase italic text-white/80">Studio Verification Active</h3>
                         </div>
 
-                        <div className="space-y-3">
-                            <h3 className="text-2xl font-black tracking-tight uppercase italic text-white">Studio Verification</h3>
-                            <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] leading-relaxed">
-                                Please interact with the advertisement <br/> to unlock your high-speed session.
-                            </p>
-                        </div>
-
-                        <div className="pt-4">
+                        <div>
                             {status === 'completed' ? (
                                 <motion.button
                                     initial={{ scale: 0.9, opacity: 0 }}
@@ -103,7 +97,7 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                                     onClick={handleSkip}
                                     className="w-full py-4 bg-purple-500 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-purple-400 transition-all shadow-xl shadow-purple-500/20 flex items-center justify-center gap-2"
                                 >
-                                    Continue to Tool
+                                    Finish & Unlock Tool
                                     <SkipForward className="w-4 h-4" />
                                 </motion.button>
                             ) : (
@@ -116,20 +110,13 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                                             transition={{ duration: 10, ease: "linear" }}
                                         />
                                     </div>
-                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-widest block">
-                                        Action Ready in {timeLeft}s
-                                    </span>
+                                    <div className="flex justify-between items-center text-[10px] font-black text-white/20 uppercase tracking-widest px-1">
+                                        <span>Commercial in progress</span>
+                                        <span>{timeLeft}s remaining</span>
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    </div>
-
-                    {/* Bottom Info */}
-                    <div className="px-8 py-5 border-t border-white/5 bg-zinc-900/40 flex items-center justify-center gap-2.5">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400/60" />
-                        <span className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em]">
-                            Native Commercial Stream Active
-                        </span>
                     </div>
                 </motion.div>
             </div>
