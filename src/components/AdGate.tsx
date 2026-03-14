@@ -26,8 +26,18 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
 
     useEffect(() => {
         if (isOpen) {
+            // Trigger the native Monetag Vignette/Interstitial instantly
+            try {
+                // @ts-ignore
+                if (window.show_8854045) { // Common Monetag trigger function
+                    // @ts-ignore
+                    window.show_8854045();
+                }
+            } catch (e) {
+                console.warn("Native ad trigger failed, falling back to wait-state.");
+            }
             setStatus('playing');
-            setTimeLeft(15);
+            setTimeLeft(10); // Native ads are usually 10s
         }
     }, [isOpen]);
 
@@ -70,77 +80,56 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(168,85,247,0.1)]"
+                    className="relative w-full max-w-xl bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(168,85,247,0.1)]"
                 >
-                    {/* Header: Status Info */}
-                    <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/20">
-                        <div className="flex items-center gap-3">
-                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Sponsored Resource</span>
+                    {/* Simplified Hub while Native Ad plays in front */}
+                    <div className="p-12 text-center space-y-8">
+                        <div className="w-20 h-20 bg-purple-500/10 rounded-full border border-purple-500/20 flex items-center justify-center mx-auto">
+                            <Zap className="w-10 h-10 text-purple-400 animate-pulse" />
                         </div>
-                        
-                        <div className="flex items-center gap-4">
+
+                        <div className="space-y-3">
+                            <h3 className="text-2xl font-black tracking-tight uppercase italic text-white">Studio Verification</h3>
+                            <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] leading-relaxed">
+                                Please interact with the advertisement <br/> to unlock your high-speed session.
+                            </p>
+                        </div>
+
+                        <div className="pt-4">
                             {status === 'completed' ? (
                                 <motion.button
                                     initial={{ scale: 0.9, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
                                     onClick={handleSkip}
-                                    className="px-8 py-2.5 bg-purple-500 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-purple-400 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-purple-500/20 flex items-center gap-2"
+                                    className="w-full py-4 bg-purple-500 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-purple-400 transition-all shadow-xl shadow-purple-500/20 flex items-center justify-center gap-2"
                                 >
-                                    Skip Ad
-                                    <SkipForward className="w-3.5 h-3.5" />
+                                    Continue to Tool
+                                    <SkipForward className="w-4 h-4" />
                                 </motion.button>
                             ) : (
-                                <button
-                                    disabled
-                                    className="px-8 py-2.5 bg-white/5 border border-white/10 text-white/20 text-[11px] font-black uppercase tracking-widest rounded-xl flex items-center gap-3 cursor-not-allowed"
-                                >
-                                    Skip in {timeLeft}s
-                                </button>
+                                <div className="space-y-4">
+                                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                                        <motion.div 
+                                            className="h-full bg-purple-500"
+                                            initial={{ width: "0%" }}
+                                            animate={{ width: "100%" }}
+                                            transition={{ duration: 10, ease: "linear" }}
+                                        />
+                                    </div>
+                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-widest block">
+                                        Action Ready in {timeLeft}s
+                                    </span>
+                                </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Ad Content area */}
-                    <div className="aspect-video w-full bg-black relative flex flex-col items-center justify-center">
-                        {/* Real Ad Iframe / Video Wrapper */}
-                        <div className="absolute inset-0 z-0">
-                            {/* NOTE: Most ad networks block direct iframes, but since the user wants it 'In-Page', 
-                                we embed the link in a container that looks native. */}
-                            <iframe 
-                                src={MONETAG_DIRECT_LINK}
-                                className="w-full h-full border-0 pointer-events-auto opacity-90"
-                                sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
-                                title="Advertisement"
-                            />
-                        </div>
-
-                        {/* Visual Overlay if ad takes time to load */}
-                        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] z-10">
-                             <div className="w-full h-1 absolute bottom-0">
-                                <motion.div 
-                                    className="h-full bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.8)]"
-                                    initial={{ width: "0%" }}
-                                    animate={{ width: "100%" }}
-                                    transition={{ duration: 15, ease: "linear" }}
-                                />
-                             </div>
-                        </div>
-                    </div>
-
-                    {/* Footer: Tips / Plan Info */}
-                    <div className="px-8 py-5 border-t border-white/5 bg-zinc-900/40 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                            <Sparkles className="w-3.5 h-3.5 text-purple-400/60" />
-                            <span className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em]">
-                                Support Tandres AI by watching this short sponsor.
-                            </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 opacity-50">
-                            <Clock className="w-3 h-3 text-white/40" />
-                            <span className="text-[9px] font-medium text-white/40 uppercase tracking-widest italic">15s Secure Session</span>
-                        </div>
+                    {/* Bottom Info */}
+                    <div className="px-8 py-5 border-t border-white/5 bg-zinc-900/40 flex items-center justify-center gap-2.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-400/60" />
+                        <span className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em]">
+                            Native Commercial Stream Active
+                        </span>
                     </div>
                 </motion.div>
             </div>
