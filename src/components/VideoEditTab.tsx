@@ -11,7 +11,6 @@ import {
     Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft, Crown
 } from 'lucide-react';
 import AdGate from './AdGate';
-import LoadingView from './LoadingView';
 import LabSubscriptions from './LabSubscriptions';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
