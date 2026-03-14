@@ -10,7 +10,6 @@ import {
     Music, Video, Zap, Trash2, Clock, Link as LinkIcon,
     Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft, Crown
 } from 'lucide-react';
-import AdGate from './AdGate';
 import LabSubscriptions from './LabSubscriptions';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -42,7 +41,6 @@ export default function VideoEditTab({
     const [outputAudioUrl, setOutputAudioUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [currentTool, setCurrentTool] = useState<ToolType>('audio-extractor');
-    const [showAd, setShowAd] = useState(false);
     const [profile, setProfile] = useState<any>(null);
     const [isSpending, setIsSpending] = useState(false);
     const [systemLocks, setSystemLocks] = useState<any[]>([]);
@@ -173,7 +171,10 @@ export default function VideoEditTab({
     };
 
     const handleEarnCredits = async () => {
-        setShowAd(true);
+        // Since we are removing the blocking gate, we can optionally 
+        // keep a way to manually earn credits if desirable, 
+        // but for now let's just log it or disable.
+        console.log("Earn Credits feature being transitioned to background multitag");
     };
 
     const resolveUrl = async () => {
@@ -419,32 +420,8 @@ export default function VideoEditTab({
             console.warn("Lock check failed, proceeding with caution.");
         }
 
-        // 2. Optimized Ad Logic (Strict check for Free Tier)
-        const isFree = !profile?.subscription_tier || profile.subscription_tier === 'free';
-
-        if (isFree) {
-            const silverCredits = profile?.free_credits || 0;
-            if (silverCredits > 0) {
-                setIsSpending(true);
-                try {
-                    await fetch('/api/free-credits', {
-                        method: 'POST',
-                        body: JSON.stringify({ userId, action: 'spend' })
-                    });
-                    fetchProfile();
-                    executeEngine();
-                } catch (e: any) {
-                    setError(e.message);
-                } finally {
-                    setIsSpending(false);
-                }
-                return;
-            } else {
-                setShowAd(true);
-                return;
-            }
-        }
-
+        // 2. Optimized Flow: No more blocking AdGate for Free Tier.
+        // Background Monetag MultiTag in RootLayout handles monetization.
         executeEngine();
     };
 
@@ -945,23 +922,8 @@ export default function VideoEditTab({
 
                                     {profile?.subscription_tier === 'free' && (
                                         <div className="flex flex-col gap-3 mt-4 px-2">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <Zap className="w-3 h-3 text-purple-400" />
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
-                                                        {profile?.free_credits || 0} Silver Credits
-                                                    </span>
-                                                </div>
-                                                 <button
-                                                    onClick={handleEarnCredits}
-                                                    className="w-full py-3 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] border border-purple-500/20 transition-all flex items-center justify-center gap-2 group"
-                                                >
-                                                    <Play className="w-3 h-3 group-hover:scale-110 transition-transform" />
-                                                    Watch Ad for +1 Silver Credit
-                                                </button>
-                                            </div>
-                                            <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest">
-                                                {profile?.free_credits > 0 ? "Skip the next ad gate by using 1 Silver credit." : "Watch an ad to unlock this action."}
+                                            <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest text-center">
+                                                Support the studio by keeping ads active. Thank you!
                                             </p>
                                         </div>
                                     )}
@@ -1125,19 +1087,7 @@ export default function VideoEditTab({
                   border-radius: 20px;
                 }
             `}</style>
-            {/* Ad Integration */}
-            <AdGate
-                isOpen={showAd}
-                onClose={() => setShowAd(false)}
-                onComplete={() => {
-                    const canRunNow = canRun;
-                    if (canRunNow) {
-                        executeEngine();
-                    } else {
-                        awardCredit();
-                    }
-                }}
-            />
+            {/* AdGate Removed for instant start experience */}
 
             {showSubscriptions && (
                 <LabSubscriptions
