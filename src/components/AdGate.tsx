@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SkipForward, Zap, Sparkles } from 'lucide-react';
+import { X, Play, ShieldAlert } from 'lucide-react';
 
 interface AdGateProps {
     isOpen: boolean;
@@ -11,94 +11,151 @@ interface AdGateProps {
     type?: 'reward' | 'required';
 }
 
+declare global {
+    interface Window {
+        fluidPlayer: any;
+    }
+}
+
 export default function AdGate({ isOpen, onClose, onComplete, type = 'required' }: AdGateProps) {
-    const [status, setStatus] = useState<'playing' | 'completed'>('playing');
-    const [timeLeft, setTimeLeft] = useState(10);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const playerInstance = useRef<any>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [adCompleted, setAdCompleted] = useState(false);
+
+    const VAST_URL = "https://necessary-jury.com/dLm.F0zidlgDNcv/ZXGYUI/GeNmt9AuXZKUrlYkiP/TCYb4vN/jckE5UM/T/cpt_NBjLgg2COLTBkNypM0Qj";
 
     useEffect(() => {
-        if (isOpen) {
-            // MultiTag handles ad rotation automatically. We provide the wait-gate.
-            setStatus('playing');
-            setTimeLeft(10); 
-        }
-    }, [isOpen]);
+        if (isOpen && videoRef.current && typeof window.fluidPlayer !== 'undefined') {
+            // Wait a tiny bit for the DOM to settle
+            const timer = setTimeout(() => {
+                try {
+                    playerInstance.current = window.fluidPlayer(videoRef.current, {
+                        layoutControls: {
+                            fillToContainer: true,
+                            primaryColor: "#a855f7",
+                            allowDownload: false,
+                            playbackRateControl: false,
+                            playPauseAnimation: true,
+                            autoPlay: true,
+                            mute: false,
+                            logo: {
+                                imageUrl: '/logo.png',
+                                clickUrl: 'https://tandresai.online',
+                                position: 'top left',
+                                opacity: 0.5
+                            },
+                            controlBar: {
+                                autoHide: true,
+                                animated: true
+                            }
+                        },
+                        vastOptions: {
+                            adList: [
+                                {
+                                    roll: 'preRoll',
+                                    vastTagLoad: (vastTag: string) => vastTag, // Just return the URL
+                                    vastTag: VAST_URL
+                                }
+                            ],
+                            adFinishedCallback: () => {
+                                console.log("Ad finished");
+                                setAdCompleted(true);
+                                onComplete();
+                                onClose();
+                            },
+                            adErrorCallback: (error: any) => {
+                                console.error("Ad Error:", error);
+                                setError("Commercial failed to load. Please try again.");
+                                // Fallback: allow them through if it's a persistent error
+                                setTimeout(() => {
+                                    onComplete();
+                                    onClose();
+                                }, 3000);
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error("Fluid Player Init Error:", e);
+                    setError("Player initialization failed.");
+                }
+            }, 100);
 
-    useEffect(() => {
-        if (status === 'playing' && timeLeft > 0) {
-            const timer = setInterval(() => {
-                setTimeLeft((prev) => {
-                    if (prev <= 1) {
-                        clearInterval(timer);
-                        setStatus('completed');
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-            return () => clearInterval(timer);
+            return () => {
+                clearTimeout(timer);
+                if (playerInstance.current) {
+                    try {
+                        playerInstance.current.destroy();
+                    } catch (e) {}
+                }
+            };
         }
-    }, [status, timeLeft]);
-
-    const handleSkip = () => {
-        if (status === 'completed') {
-            onComplete();
-            onClose();
-        }
-    };
+    }, [isOpen, onComplete, onClose]);
 
     if (!isOpen) return null;
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[100] flex items-end justify-center pb-20 p-4 pointer-events-none">
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
+                    className="absolute inset-0 bg-black/95 backdrop-blur-xl"
+                    onClick={() => adCompleted && onClose()}
                 />
 
                 <motion.div
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 50 }}
-                    className="relative w-full max-w-md bg-[#0a0a0a]/90 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl pointer-events-auto"
+                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                    className="relative w-full max-w-4xl aspect-video bg-black border border-white/5 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(168,85,247,0.1)] flex flex-col items-center justify-center"
                 >
-                    <div className="p-8 text-center space-y-6">
-                        <div className="flex items-center justify-center gap-3">
-                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                            <h3 className="text-sm font-black tracking-tight uppercase italic text-white/80">Studio Verification Active</h3>
+                    {/* Header */}
+                    <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-b from-black/80 to-transparent">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">
+                                {type === 'reward' ? 'Earn Silver Credit' : 'Unlocking Tool Access'}
+                            </span>
                         </div>
-
-                        <div>
-                            {status === 'completed' ? (
-                                <motion.button
-                                    initial={{ scale: 0.9, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    onClick={handleSkip}
-                                    className="w-full py-4 bg-purple-500 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-purple-400 transition-all shadow-xl shadow-purple-500/20 flex items-center justify-center gap-2"
-                                >
-                                    Finish & Unlock Tool
-                                    <SkipForward className="w-4 h-4" />
-                                </motion.button>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                                        <motion.div 
-                                            className="h-full bg-purple-500"
-                                            initial={{ width: "0%" }}
-                                            animate={{ width: "100%" }}
-                                            transition={{ duration: 10, ease: "linear" }}
-                                        />
-                                    </div>
-                                    <div className="flex justify-between items-center text-[10px] font-black text-white/20 uppercase tracking-widest px-1">
-                                        <span>Commercial in progress</span>
-                                        <span>{timeLeft}s remaining</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        {adCompleted && (
+                            <button 
+                                onClick={onClose}
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                            >
+                                <X className="w-5 h-5 text-white" />
+                            </button>
+                        )}
                     </div>
+
+                    {/* Error State */}
+                    {error && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-20 bg-black/80">
+                            <ShieldAlert className="w-12 h-12 text-red-500 mb-4" />
+                            <h3 className="text-xl font-bold text-white mb-2">Something went wrong</h3>
+                            <p className="text-white/60 mb-6">{error}</p>
+                            <button 
+                                onClick={onClose}
+                                className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-bold transition-all"
+                            >
+                                Close & Retry
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Video Player */}
+                    <video ref={videoRef} className="w-full h-full object-cover">
+                        <source src="/placeholder_video.mp4" type="video/mp4" />
+                    </video>
+
+                    {/* Pre-load message */}
+                    {!playerInstance.current && !error && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-0">
+                            <Play className="w-16 h-16 text-purple-500/20 animate-pulse mb-4" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Establishing Studio Connection...</p>
+                        </div>
+                    )}
                 </motion.div>
             </div>
         </AnimatePresence>
