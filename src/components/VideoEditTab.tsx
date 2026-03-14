@@ -24,16 +24,16 @@ interface StreamInfo {
     formats?: any[];
 }
 
-export default function VideoEditTab({ 
-    userId, 
-    onOpenPayment, 
-    refreshTrigger, 
-    onSuccess 
-}: { 
-    userId?: string, 
+export default function VideoEditTab({
+    userId,
+    onOpenPayment,
+    refreshTrigger,
+    onSuccess
+}: {
+    userId?: string,
     onOpenPayment?: () => void,
     refreshTrigger?: number,
-    onSuccess?: () => void 
+    onSuccess?: () => void
 }) {
     const [loaded, setLoaded] = useState(false);
     const [processing, setProcessing] = useState(false);
@@ -113,11 +113,11 @@ export default function VideoEditTab({
             .select('*')
             .eq('id', userId)
             .single();
-        
+
         if (profile) {
             const now = new Date();
             const expiry = profile.plan_expires_at ? new Date(profile.plan_expires_at) : null;
-            
+
             // Auto-activate queued plan if current one is expired
             if (!expiry || expiry <= now) {
                 const { data: queue } = await supabase
@@ -128,11 +128,11 @@ export default function VideoEditTab({
                     .order('created_at', { ascending: true })
                     .limit(1)
                     .single();
-                
+
                 if (queue) {
                     const newExpiry = new Date();
                     newExpiry.setDate(newExpiry.getDate() + queue.duration_days);
-                    
+
                     const { data: updatedProfile, error: updateError } = await supabase
                         .from('profiles')
                         .update({
@@ -144,7 +144,7 @@ export default function VideoEditTab({
                         .eq('id', userId)
                         .select()
                         .single();
-                        
+
                     if (!updateError) {
                         await supabase.from('subscription_queue').update({ status: 'active' }).eq('id', queue.id);
                         setProfile(updatedProfile);
@@ -404,12 +404,12 @@ export default function VideoEditTab({
         // 1. Check System Locks (The "Kill Switch")
         try {
             const { data: locks } = await supabase.from('system_locks').select('*');
-            const toolId = currentTool === 'audio-extractor' ? (selectedFiles.length > 0 ? 'audio_upload' : 'audio_link') : 
-                          currentTool === 'video-extractor' ? 'video_link' : 
-                          currentTool === 'trimmer' ? 'audio_trimmer' :
-                          currentTool === 'joiner' ? 'audio_joiner' :
-                          currentTool.replace('-', '_');
-            
+            const toolId = currentTool === 'audio-extractor' ? (selectedFiles.length > 0 ? 'audio_upload' : 'audio_link') :
+                currentTool === 'video-extractor' ? 'video_link' :
+                    currentTool === 'trimmer' ? 'audio_trimmer' :
+                        currentTool === 'joiner' ? 'audio_joiner' :
+                            currentTool.replace('-', '_');
+
             const toolLock = locks?.find(l => l.id === toolId);
             if (toolLock?.is_locked) {
                 setError(toolLock.lock_message || "This tool is under maintenance.");
@@ -473,7 +473,7 @@ export default function VideoEditTab({
                     const alreadyWrapped = workerUrl && urlStr.startsWith(workerUrl);
 
                     let fetchUrl = '';
-                    
+
                     if (urlStr.startsWith('/api/')) {
                         fetchUrl = urlStr;
                     } else if (urlStr.startsWith('/downloads')) {
@@ -952,12 +952,12 @@ export default function VideoEditTab({
                                                         {profile?.free_credits || 0} Silver Credits
                                                     </span>
                                                 </div>
-                                                <button
+                                                 <button
                                                     onClick={handleEarnCredits}
-                                                    className="text-[10px] font-black uppercase tracking-widest text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                                                    className="w-full py-3 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] border border-purple-500/20 transition-all flex items-center justify-center gap-2 group"
                                                 >
-                                                    <Sparkles className="w-3 h-3 animate-pulse" />
-                                                    Earn More
+                                                    <Play className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                                                    Watch Ad for +1 Silver Credit
                                                 </button>
                                             </div>
                                             <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest">
@@ -1140,9 +1140,9 @@ export default function VideoEditTab({
             />
 
             {showSubscriptions && (
-                <LabSubscriptions 
-                    userId={userId || ''} 
-                    onClose={() => setShowSubscriptions(false)} 
+                <LabSubscriptions
+                    userId={userId || ''}
+                    onClose={() => setShowSubscriptions(false)}
                     onPurchase={(plan) => {
                         onOpenPayment?.();
                         setShowSubscriptions(false);
@@ -1152,11 +1152,11 @@ export default function VideoEditTab({
 
             <AnimatePresence>
                 {durationLimitError && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md"
                     >
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
                             className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-md w-full text-center"
                         >
@@ -1168,13 +1168,13 @@ export default function VideoEditTab({
                                 {durationLimitError.error}
                             </p>
                             <div className="space-y-3">
-                                <button 
+                                <button
                                     onClick={() => { setShowSubscriptions(true); setDurationLimitError(null); }}
                                     className="w-full py-4 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl shadow-lg transition-all"
                                 >
                                     Upgrade Studio
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setDurationLimitError(null)}
                                     className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-all"
                                 >
