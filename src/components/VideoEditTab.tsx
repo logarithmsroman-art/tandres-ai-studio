@@ -11,7 +11,7 @@ import {
     Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft, Crown
 } from 'lucide-react';
 import AdGate from './AdGate';
-import AdBanner from './AdBanner';
+import LoadingView from './LoadingView';
 import LabSubscriptions from './LabSubscriptions';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -995,7 +995,7 @@ export default function VideoEditTab({
 
                     {/* Right Panel: Output & Live Preview */}
                     <div className="xl:col-span-4 space-y-6">
-                        {profile?.subscription_tier === 'free' && <AdBanner />}
+                        {/* Global ads handled by RootLayout MultiTag */}
                         <section className="bg-zinc-900/50 border border-white/5 rounded-[40px] p-8 space-y-6">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Live Workspace</h3>
 

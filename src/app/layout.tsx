@@ -31,7 +31,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Monetag Script removed to prevent intrusive redirects as per user request */}
+        {/* Monetag MultiTag (All-in-One) - Dreamy Tag */}
+        <Script
+          src="https://quge5.com/88/tag.min.js"
+          data-zone="219149"
+          strategy="afterInteractive"
+          data-cfasync="false"
+        />
       </head>
       <body
         className={`${inter.variable} ${outfit.variable} antialiased`}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, SkipForward, X, AlertCircle, Loader2, Sparkles, Zap, Clock } from 'lucide-react';
+import { SkipForward, Zap, Sparkles } from 'lucide-react';
 
 interface AdGateProps {
     isOpen: boolean;
@@ -12,17 +12,8 @@ interface AdGateProps {
 }
 
 export default function AdGate({ isOpen, onClose, onComplete, type = 'required' }: AdGateProps) {
-    const [status, setStatus] = useState<'loading' | 'optimizing' | 'waiting' | 'playing' | 'completed'>('loading');
-    const [timeLeft, setTimeLeft] = useState(15);
-    const [providerIndex, setProviderIndex] = useState(0);
-
-    const MONETAG_DIRECT_LINK = "https://omg10.com/4/10721609";
-
-    const providers = [
-        { name: 'Monetag', weight: 1 },
-        { name: 'Adsterra', weight: 0.8 },
-        { name: 'PropellerAds', weight: 0.6 }
-    ];
+    const [status, setStatus] = useState<'playing' | 'completed'>('playing');
+    const [timeLeft, setTimeLeft] = useState(10);
 
     useEffect(() => {
         if (isOpen) {
