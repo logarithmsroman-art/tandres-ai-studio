@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface AdGateProps {
     isOpen: boolean;
@@ -20,8 +20,7 @@ declare global {
 export default function AdGate({ isOpen, onClose, onComplete, type = 'required' }: AdGateProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const playerInstance = useRef<any>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [isPlayerReady, setIsPlayerReady] = useState(false);
+    const [isThinking, setIsThinking] = useState(true);
 
     const VAST_URL = "https://necessary-jury.com/dLm.F0zidlgDNcv/ZXGYUI/GeNmt9AuXZKUrlYkiP/TCYb4vN/jckE5UM/T/cpt_NBjLgg2COLTBkNypM0Qj";
 
@@ -31,20 +30,7 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
         let checkInterval: NodeJS.Timeout;
         let timeoutTimer: NodeJS.Timeout;
 
-        const cleanup = () => {
-            if (checkInterval) clearInterval(checkInterval);
-            if (timeoutTimer) clearTimeout(timeoutTimer);
-            if (playerInstance.current && playerInstance.current.destroy) {
-                try {
-                    playerInstance.current.destroy();
-                    playerInstance.current = null;
-                } catch (e) {
-                    console.error("Error destroying player:", e);
-                }
-            }
-        };
-
-        checkInterval = setInterval(() => {
+        const init = () => {
             if (window.fluidPlayer && videoRef.current) {
                 clearInterval(checkInterval);
                 try {
@@ -56,17 +42,13 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                             playbackRateControl: false,
                             playPauseAnimation: true,
                             autoPlay: true,
-                            mute: true, // Required for autoplay
+                            mute: true,
                             logo: {
                                 imageUrl: '/logo.png',
                                 clickUrl: 'https://tandresai.online',
                                 position: 'top left',
                                 opacity: 0.5
                             },
-                            controlBar: {
-                                autoHide: true,
-                                animated: true
-                            }
                         },
                         vastOptions: {
                             adList: [
@@ -75,71 +57,72 @@ export default function AdGate({ isOpen, onClose, onComplete, type = 'required' 
                                     vastTag: VAST_URL
                                 }
                             ],
-                            vastTimeout: 10000,
                             adFinishedCallback: () => {
                                 onComplete();
                                 onClose();
                             },
                             adErrorCallback: (err: any) => {
-                                console.warn("VAST Error (continuing to tool):", err);
-                                // Fallback: if ad fails, don't block the user
+                                console.warn("Ad skip/error:", err);
                                 onComplete();
                                 onClose();
                             }
                         }
                     });
-                    setIsPlayerReady(true);
+                    
+                    // Once initialized, hide our loader and let Fluid Player show its own if needed
+                    setTimeout(() => setIsThinking(false), 500);
                 } catch (e) {
                     console.error("Fluid Player init error:", e);
-                    setError("Failed to start player.");
+                    onComplete();
+                    onClose();
                 }
             }
-        }, 100);
+        };
 
-        // Max wait 8 seconds for the whole thing
+        checkInterval = setInterval(init, 200);
+
+        // Fail-safe: if nothing happens in 10 seconds, let them in
         timeoutTimer = setTimeout(() => {
-            if (!isPlayerReady && !error) {
-                console.warn("Ad load timeout - granting access");
-                onComplete();
-                onClose();
-            }
-        }, 8000);
+            onComplete();
+            onClose();
+        }, 10000);
 
-        return cleanup;
-    }, [isOpen, onComplete, onClose]);
+        return () => {
+            clearInterval(checkInterval);
+            clearTimeout(timeoutTimer);
+            if (playerInstance.current) {
+                try {
+                    playerInstance.current.destroy();
+                } catch (e) {}
+            }
+        };
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-md">
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black">
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="relative w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-[0_0_100px_rgba(168,85,247,0.15)]"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="w-full h-full flex flex-col items-center justify-center p-0 md:p-12 lg:p-20"
                 >
-                    <video ref={videoRef} playsInline muted className="w-full h-full object-cover">
-                        <source src="" type="video/mp4" />
-                    </video>
+                    <div className="relative w-full h-full max-w-6xl aspect-video bg-black shadow-2xl overflow-hidden rounded-0 md:rounded-3xl border border-white/5">
+                        {/* Fluid Player will take over this video tag */}
+                        <video ref={videoRef} playsInline muted className="w-full h-full">
+                            <source src="https://cdn.fluidplayer.com/videos/vtt_example.mp4" type="video/mp4" />
+                        </video>
 
-                    {/* Clean Loading State - No 'nonsense' buttons */}
-                    {!isPlayerReady && !error && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-20">
-                            <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4" />
-                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Studio Connection Active</p>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-30 p-8 text-center">
-                            <ShieldAlert className="w-12 h-12 text-red-500 mb-4" />
-                            <p className="text-white font-bold mb-4">{error}</p>
-                            <button onClick={onClose} className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all">
-                                Close
-                            </button>
-                        </div>
-                    )}
+                        {/* Initial "Studio Connection" screen - simpler and centered */}
+                        {isThinking && (
+                            <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-50">
+                                <Loader2 className="w-12 h-12 text-purple-600 animate-spin mb-4" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 italic">Establishing Link...</p>
+                            </div>
+                        )}
+                    </div>
                 </motion.div>
             </div>
         </AnimatePresence>
