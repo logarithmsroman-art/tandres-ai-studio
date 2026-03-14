@@ -349,19 +349,7 @@ export default function Home() {
               />
             )}
 
-            <AdGate
-              isOpen={showAdForCredits}
-              onClose={() => setShowAdForCredits(false)}
-              onComplete={async () => {
-                if (user) {
-                  const res = await fetch('/api/free-credits', {
-                    method: 'POST',
-                    body: JSON.stringify({ userId: user.id, action: 'get' })
-                  });
-                  if (res.ok) fetchProfile(user.id);
-                }
-              }}
-            />
+
 
             <AnimatePresence>
               {isLogoutConfirmOpen && (

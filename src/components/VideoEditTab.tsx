@@ -11,6 +11,7 @@ import {
     Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft, Crown
 } from 'lucide-react';
 import LabSubscriptions from './LabSubscriptions';
+import AdBanner from './AdBanner';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -922,6 +923,7 @@ export default function VideoEditTab({
 
                                     {profile?.subscription_tier === 'free' && (
                                         <div className="flex flex-col gap-3 mt-4 px-2">
+                                            <AdBanner />
                                             <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest text-center">
                                                 Support the studio by keeping ads active. Thank you!
                                             </p>

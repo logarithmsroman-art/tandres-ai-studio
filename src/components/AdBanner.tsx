@@ -9,7 +9,7 @@ export default function AdBanner() {
     useEffect(() => {
         if (typeof window !== 'undefined' && !scriptLoaded.current && containerRef.current) {
             const script = document.createElement('script');
-            script.innerHTML = `(function(s){s.dataset.zone='10730532',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`;
+            script.innerHTML = `(function(s){s.dataset.zone='10730424',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`;
             containerRef.current.appendChild(script);
             scriptLoaded.current = true;
         }
