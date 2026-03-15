@@ -44,7 +44,6 @@ export async function POST(req: Request) {
                 const isPlanActive = currentExpiry && currentExpiry > now;
 
                 if (isPlanActive) {
-                    // Plan is active, put the new one in the queue
                     const { error: queueError } = await supabase
                         .from('subscription_queue')
                         .insert({
@@ -58,27 +57,25 @@ export async function POST(req: Request) {
                     if (queueError) throw queueError;
                     return NextResponse.json({ success: true, status: 'queued', plan: planName });
                 } else {
-                    // No active plan, start this one immediately
                     const newExpiry = new Date();
                     newExpiry.setDate(newExpiry.getDate() + durationDays);
 
                     const { error: updateError } = await supabase
                         .from('profiles')
-                        .update({
+                        .upsert({
+                            id: userId,
                             subscription_tier: planName,
                             plan_started_at: new Date().toISOString(),
                             plan_expires_at: newExpiry.toISOString(),
-                            tiktok_extractions_remaining: tiktokAllotment, // Initial refill
+                            tiktok_extractions_remaining: tiktokAllotment,
                             updated_at: new Date().toISOString()
-                        })
-                        .eq('id', userId);
+                        });
 
                     if (updateError) throw updateError;
                     return NextResponse.json({ success: true, status: 'activated', plan: planName, expires: newExpiry });
                 }
 
             } else if (type === 'silver_credits') {
-                // Add 500 Silver Credits (₦3,000 Bridge Pack)
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('free_credits')
@@ -90,11 +87,11 @@ export async function POST(req: Request) {
 
                 const { error: updateError } = await supabase
                     .from('profiles')
-                    .update({
+                    .upsert({
+                        id: userId,
                         free_credits: newSilver,
                         updated_at: new Date().toISOString()
-                    })
-                    .eq('id', userId);
+                    });
 
                 if (updateError) throw updateError;
                 return NextResponse.json({ success: true, newSilver });
@@ -108,16 +105,15 @@ export async function POST(req: Request) {
                     .single();
 
                 const currentCredits = profile?.credits || 0;
-                const newCredits = currentCredits + (credits || 0);
+                const newCredits = currentCredits + (credits || 10); // Default to 10 if missing
 
                 const { error: updateError } = await supabase
                     .from('profiles')
-                    .update({
+                    .upsert({
                         id: userId,
                         credits: newCredits,
                         updated_at: new Date().toISOString()
-                    })
-                    .eq('id', userId);
+                    });
 
                 if (updateError) throw updateError;
                 return NextResponse.json({ success: true, newCredits });
