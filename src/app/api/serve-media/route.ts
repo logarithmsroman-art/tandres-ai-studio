@@ -11,6 +11,21 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: 'Filename required' }, { status: 400 });
     }
 
+    // 1. Verify Authentication via Authorization Header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+        return NextResponse.json({ error: 'Auth header missing.' }, { status: 401 });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { createClient } = require('@supabase/supabase-js');
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { data: { user }, error: authError } = await sb.auth.getUser(token);
+
+    if (authError || !user) {
+        return NextResponse.json({ error: 'Invalid or expired session.' }, { status: 401 });
+    }
+
     let filePath: string;
 
     // Allow serving from OS temp dir (for TikTok direct downloads)
@@ -20,7 +35,7 @@ export async function GET(req: Request) {
         filePath = fileName;
     } else {
         // Safety check: ensure we only serve from the downloads directory
-        const downloadsDir = path.join(process.cwd(), 'public', 'downloads');
+        const downloadsDir = path.join(process.cwd(), 'downloads');
         filePath = path.join(downloadsDir, fileName.replace('/downloads/', ''));
     }
 

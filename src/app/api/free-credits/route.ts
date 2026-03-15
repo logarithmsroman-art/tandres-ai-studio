@@ -7,11 +7,22 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(req: Request) {
     try {
-        const { userId, action } = await req.json();
+        const { action } = await req.json();
 
-        if (!userId) {
-            return NextResponse.json({ error: 'Auth required' }, { status: 401 });
+        // 1. Verify Authentication via Authorization Header
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return NextResponse.json({ error: 'Auth header missing.' }, { status: 401 });
         }
+
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Invalid or expired session.' }, { status: 401 });
+        }
+
+        const userId = user.id;
 
         const { data: profile, error: fetchError } = await supabase
             .from('profiles')

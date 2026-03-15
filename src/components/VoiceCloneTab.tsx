@@ -90,10 +90,16 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
         setError(null);
 
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('Session expired. Please login again.');
+
             const res = await fetch('/api/voice-clone', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ voiceAudio: voiceSample, text, userId }),
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ voiceAudio: voiceSample, text }),
             });
 
             const data = await res.json();

@@ -156,11 +156,17 @@ export default function VideoEditTab({
     };
 
     const awardCredit = async () => {
-        if (!userId) return;
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
             const res = await fetch('/api/free-credits', {
                 method: 'POST',
-                body: JSON.stringify({ userId, action: 'get' })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ action: 'get' })
             });
             const data = await res.json();
             if (data.success) {
@@ -206,9 +212,16 @@ export default function VideoEditTab({
         try {
             // STRATEGY: 
             // 1. ALL LINKS: Use our stable server-side API (Railway Detective + Cloudflare Courier)
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('Please login to process links.');
+
             const res = await fetch('/api/video-edit', {
                 method: 'POST',
-                body: JSON.stringify({ action: 'resolve-url', url: pastedUrl, userId })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ action: 'resolve-url', url: pastedUrl })
             });
             const data = await res.json();
             if (res.ok) {
@@ -461,7 +474,15 @@ export default function VideoEditTab({
                         fetchUrl = `/api/proxy?url=${encodeURIComponent(urlStr)}`;
                     }
 
-                    const fRes = await fetch(fetchUrl);
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const fetchUrlHeaders: any = {};
+                    if (session) {
+                        fetchUrlHeaders['Authorization'] = `Bearer ${session.access_token}`;
+                    }
+
+                    const fRes = await fetch(fetchUrl, {
+                        headers: fetchUrlHeaders
+                    });
                     if (!fRes.ok) {
                         const errData = await fRes.json().catch(() => ({}));
                         throw new Error(errData.error || `Source fetch failed: ${fRes.status}`);
@@ -582,7 +603,6 @@ export default function VideoEditTab({
                             <h1 className="text-4xl font-black tracking-tighter uppercase italic">The Lab</h1>
                             <div className="flex items-center gap-3 mt-1">
                                 <span className="text-[10px] font-black uppercase tracking-[0.2em] px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-md border border-purple-500/20">Studio</span>
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Nigeria</span>
                             </div>
                         </div>
                     </div>

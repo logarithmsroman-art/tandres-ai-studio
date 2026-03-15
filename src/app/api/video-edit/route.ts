@@ -23,11 +23,33 @@ export async function POST(req: NextRequest) {
 
         const contentType = req.headers.get('content-type') || '';
 
+        // 1. Verify Authentication via Authorization Header
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return NextResponse.json({ error: 'Auth header missing.' }, { status: 401 });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        const { createClient: createSupbaseClient } = require('@supabase/supabase-js');
+        const sbAuth = createSupbaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+        const { data: { user }, error: authError } = await sbAuth.auth.getUser(token);
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Invalid or expired session.' }, { status: 401 });
+        }
+
+        const authenticatedUserId = user.id;
+
+        const downloadsDir = path.join(process.cwd(), 'downloads');
+        if (!fs.existsSync(downloadsDir)) {
+            fs.mkdirSync(downloadsDir, { recursive: true });
+        }
+
         if (contentType.includes('multipart/form-data')) {
             const formData = await req.formData();
             action = formData.get('action') as string;
             url = (formData.get('url') || formData.get('fileUrl')) as string;
-            userId = formData.get('userId') as string;
+            userId = authenticatedUserId;
             uploadedFile = formData.get('file') as File;
             const multiFiles = formData.getAll('files') as File[];
             startTime = Number(formData.get('startTime')) || 0;
@@ -38,7 +60,7 @@ export async function POST(req: NextRequest) {
                     const buffer = Buffer.from(await f.arrayBuffer());
                     const fId = crypto.randomUUID().slice(0, 4);
                     const ext = path.extname(f.name) || '.mp3';
-                    const p = path.join(process.cwd(), 'public', 'downloads', `track-${fId}${ext}`);
+                    const p = path.join(downloadsDir, `track-${fId}${ext}`);
                     fs.writeFileSync(p, buffer);
                     fileUrls.push(`/downloads/track-${fId}${ext}`);
                 }
@@ -47,15 +69,10 @@ export async function POST(req: NextRequest) {
             const body = await req.json();
             action = body.action;
             url = body.url || body.fileUrl;
-            userId = body.userId;
+            userId = authenticatedUserId;
             fileUrls = body.fileUrls || [];
             startTime = Number(body.startTime) || 0;
             duration = Number(body.duration) || 10;
-        }
-
-        const downloadsDir = path.join(process.cwd(), 'public', 'downloads');
-        if (!fs.existsSync(downloadsDir)) {
-            fs.mkdirSync(downloadsDir, { recursive: true });
         }
 
         const runId = crypto.randomUUID().slice(0, 8);
@@ -218,7 +235,7 @@ export async function POST(req: NextRequest) {
             const outFile = path.join(downloadsDir, `merged-${runId}.mp3`);
             const command = ffmpeg();
             for (const fUrl of fileUrls) {
-                const p = fUrl.startsWith('/downloads') ? path.join(process.cwd(), 'public', fUrl) : (fUrl.startsWith('http') ? fUrl : path.join(process.cwd(), 'public', fUrl));
+                const p = fUrl.startsWith('/downloads') ? path.join(process.cwd(), fUrl) : (fUrl.startsWith('http') ? fUrl : path.join(process.cwd(), fUrl));
                 if (fs.existsSync(p as string) || (p as string).startsWith('http')) command.input(p as string);
             }
             await new Promise((resolve, reject) => { command.on('end', resolve).on('error', reject).mergeToFile(outFile, downloadsDir); });

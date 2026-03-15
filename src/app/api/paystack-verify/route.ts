@@ -9,14 +9,27 @@ const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { reference, userId, type, credits, planName, months } = body;
-
-        if (!reference || !userId) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 });
         }
 
-        console.log(`[paystack-verify] Verifying reference: ${reference} for user: ${userId}`);
+        const token = authHeader.split(' ')[1];
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+        }
+
+        const userId = user.id;
+        const body = await req.json();
+        const { reference, type, credits, planName, months } = body;
+
+        if (!reference) {
+            return NextResponse.json({ error: 'Missing payment reference' }, { status: 400 });
+        }
+
+        console.log(`[paystack-verify] Verifying reference: ${reference} for authenticated user: ${userId}`);
 
         // Verify with Paystack
         const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {

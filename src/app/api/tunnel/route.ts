@@ -11,6 +11,21 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 
+    // 1. Verify Authentication via Authorization Header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+        return NextResponse.json({ error: 'Auth header missing.' }, { status: 401 });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { createClient } = require('@supabase/supabase-js');
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { data: { user }, error: authError } = await sb.auth.getUser(token);
+
+    if (authError || !user) {
+        return NextResponse.json({ error: 'Invalid or expired session.' }, { status: 401 });
+    }
+
     let customHeaders: Record<string, string> = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         'Accept': '*/*',

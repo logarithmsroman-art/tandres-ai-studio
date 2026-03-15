@@ -83,21 +83,32 @@ async function runFishSpeech(voiceAudio: string, text: string): Promise<string> 
 
 export async function POST(req: Request) {
     try {
-        const { voiceAudio, text, userId } = await req.json();
+        const { voiceAudio, text } = await req.json();
+
+        // 1. Verify Authentication via Authorization Header
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return NextResponse.json({ error: 'Auth header missing.' }, { status: 401 });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Invalid or expired session.' }, { status: 401 });
+        }
+
+        const userId = user.id;
 
         if (!voiceAudio || !text) {
             return NextResponse.json({ error: 'Voice sample and text are required.' }, { status: 400 });
-        }
-
-        if (!userId) {
-            return NextResponse.json({ error: 'User must be logged in.' }, { status: 401 });
         }
 
         if (text.length > CHARACTER_LIMIT) {
             return NextResponse.json({ error: `Text too long. Maximum ${CHARACTER_LIMIT} characters allowed.` }, { status: 400 });
         }
 
-        // 1. Check user credits first
+        // 2. Check user credits
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('credits')
@@ -114,10 +125,10 @@ export async function POST(req: Request) {
 
         const humanizedText = humanizeText(text);
 
-        // 2. Perform AI generation
+        // 3. Perform AI generation
         const audioUrl = await runFishSpeech(voiceAudio, humanizedText);
 
-        // 3. Deduct credit after successful generation
+        // 4. Deduct credit after successful generation
         const { error: updateError } = await supabase
             .from('profiles')
             .update({ credits: profile.credits - 1 })
@@ -125,7 +136,6 @@ export async function POST(req: Request) {
 
         if (updateError) {
             console.error('[voice-clone] Credit deduction error:', updateError);
-            // We still return the audio because it was generated successfully
         }
 
         return NextResponse.json({ url: audioUrl });

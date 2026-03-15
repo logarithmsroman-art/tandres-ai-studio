@@ -170,62 +170,54 @@ export default function Home() {
                     <Logo size="sm" glow={false} />
                   </motion.div>
                   <div className="flex flex-col">
-                    <span className="font-bold tracking-tight text-white/90 leading-none group-hover:text-white transition-colors">Tandres Simplicity</span>
+                    <span className="font-bold tracking-tight text-white/90 leading-none group-hover:text-white transition-colors text-sm md:text-base">Tandres Simplicity</span>
                     <motion.span
                       animate={{ opacity: [0.4, 1, 0.4] }}
                       transition={{ duration: 3, repeat: Infinity }}
-                      className="text-[10px] font-black uppercase tracking-[0.3em] text-purple-400 mt-1"
+                      className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] text-purple-400 mt-1"
                     >
                       AI Studio
                     </motion.span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-8">
+                <div className="flex items-center gap-2 md:gap-8">
                   {user ? (
                     <>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 md:gap-4">
                         <Link
                           href="/dashboard"
-                          className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors"
+                          className="hidden lg:block text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors"
                         >
                           Dashboard
                         </Link>
 
-                        <div className="flex items-center gap-3 px-6 py-3 bg-[#0a0a0a] border border-white/5 rounded-2xl">
-                          <div className="flex items-center gap-1.5 border-r border-white/5 pr-4">
-                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                              Gold: {profile?.credits ?? 0}
+                        <div className="flex items-center gap-2 md:gap-3 px-3 md:px-6 py-2 md:py-3 bg-[#0a0a0a] border border-white/5 rounded-2xl">
+                          <div className="flex items-center gap-1.5 border-r border-white/5 pr-2 md:pr-4">
+                            <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                            <span className="text-[8px] md:text-[10px] font-black text-white uppercase tracking-widest leading-none">
+                              {profile?.credits ?? 0} <span className="hidden sm:inline">Gold</span>
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5 border-r border-white/5 pr-4">
-                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
-                            <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
-                              {profile?.free_credits ?? (profile as any)?.silver_credits ?? 0} Silver
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-zinc-600" />
+                            <span className="text-[8px] md:text-[10px] font-black text-white/60 uppercase tracking-widest leading-none">
+                              {profile?.free_credits ?? 0} <span className="hidden sm:inline">Silver</span>
                             </span>
                           </div>
-                          {profile?.subscription_tier === 'free' && (
-                            <button
-                              onClick={() => setShowAdForCredits(true)}
-                              className="bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 px-3 py-1.5 rounded-xl border border-purple-500/20 text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
-                            >
-                              <Sparkles className="w-3 h-3 animate-pulse" />
-                              Earn
-                            </button>
-                          )}
                         </div>
 
                         <button
                           onClick={() => setIsPaymentOpen(true)}
-                          className="bg-white text-black text-xs font-black px-6 py-3 rounded-2xl shadow-2xl hover:bg-white/90 transition-all active:scale-95 group flex items-center gap-2 uppercase tracking-wider"
+                          className="bg-white text-black h-9 md:h-12 px-4 md:px-6 rounded-xl md:rounded-2xl shadow-2xl hover:bg-white/90 transition-all active:scale-95 group flex items-center gap-2 uppercase tracking-wider text-[10px] md:text-xs font-black"
                         >
-                          Top Up
-                          <Zap className="w-3.5 h-3.5 fill-black" />
+                          <Zap className="w-3 md:w-3.5 h-3 md:h-3.5 fill-black" />
+                          <span className="hidden xs:inline">Top Up</span>
                         </button>
+                        
                         <button
                           onClick={() => setIsLogoutConfirmOpen(true)}
-                          className="h-10 w-10 border border-white/5 rounded-xl flex items-center justify-center text-white/20 hover:text-white transition-colors"
+                          className="h-9 md:h-12 w-9 md:w-12 border border-white/5 rounded-xl flex items-center justify-center text-white/20 hover:text-white transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                         </button>
@@ -234,7 +226,7 @@ export default function Home() {
                   ) : (
                     <button
                       onClick={() => setIsAuthOpen(true)}
-                      className="bg-white/[0.03] border border-white/5 text-white text-xs font-black px-8 py-3.5 rounded-2xl hover:bg-white/[0.08] hover:border-white/20 transition-all active:scale-95 uppercase tracking-widest"
+                      className="bg-white/[0.03] border border-white/5 text-white text-[10px] md:text-xs font-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-white/[0.08] hover:border-white/20 transition-all active:scale-95 uppercase tracking-widest"
                     >
                       Enter Studio
                     </button>
@@ -320,9 +312,9 @@ export default function Home() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 1, duration: 1 }}
-                    className="text-white/40 text-xl leading-relaxed max-w-2xl mx-auto font-medium"
+                    className="text-white/40 text-sm md:text-xl leading-relaxed max-w-2xl mx-auto font-medium px-4"
                   >
-                    Professional grade AI media tools localized for content creators in Nigeria. High fidelity, zero complexity.
+                    Professional grade AI media tools for elite digital artists and global content creators. High fidelity, zero complexity.
                   </motion.p>
                 </motion.div>
               </header>

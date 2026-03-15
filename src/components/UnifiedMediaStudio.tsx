@@ -40,14 +40,14 @@ export default function UnifiedMediaStudio({ userId }: UnifiedMediaStudioProps) 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="grid grid-cols-1 md:grid-cols-2 gap-8"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 px-4 md:px-0"
                 >
                     {tools.map((tool) => (
                         <Link href={tool.href} key={tool.id}>
                             <motion.div
                                 whileHover={{ y: -8 }}
                                 whileTap={{ scale: 0.98 }}
-                                className="group relative p-12 bg-white/[0.03] border border-white/10 rounded-[2.5rem] overflow-hidden text-left transition-all hover:bg-white/[0.05] hover:border-white/20 h-full"
+                                className="group relative p-8 md:p-12 bg-white/[0.03] border border-white/10 rounded-[2rem] md:rounded-[2.5rem] overflow-hidden text-left transition-all hover:bg-white/[0.05] hover:border-white/20 h-full"
                             >
                                 {/* Active Background Glow */}
                                 <div
@@ -55,27 +55,27 @@ export default function UnifiedMediaStudio({ userId }: UnifiedMediaStudioProps) 
                                     style={{ background: `radial-gradient(circle, ${tool.glow} 0%, transparent 70%)` }}
                                 />
 
-                                <div className="relative z-10 flex flex-col h-full gap-6">
-                                    <div className={`h-16 w-16 bg-gradient-to-tr ${tool.color} rounded-2xl flex items-center justify-center shadow-lg shadow-purple-900/20`}>
+                                <div className="relative z-10 flex flex-col h-full gap-4 md:gap-6">
+                                    <div className={`h-12 w-12 md:h-16 md:w-16 bg-gradient-to-tr ${tool.color} rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg shadow-purple-900/20`}>
                                         {tool.icon}
                                     </div>
 
                                     <div>
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <h3 className="text-4xl font-bold tracking-tight">{tool.title}</h3>
+                                        <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                            <h3 className="text-2xl md:text-4xl font-bold tracking-tight">{tool.title}</h3>
                                             {tool.premium && (
-                                                <span className="px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] uppercase font-black rounded-full tracking-widest">Premium</span>
+                                                <span className="px-3 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[8px] md:text-[10px] uppercase font-black rounded-full tracking-widest">Premium</span>
                                             )}
                                         </div>
-                                        <p className="text-white/40 text-lg leading-relaxed max-w-sm">
+                                        <p className="text-white/40 text-sm md:text-lg leading-relaxed max-w-sm">
                                             {tool.description}
                                         </p>
                                     </div>
 
-                                    <div className="mt-auto pt-8 flex items-center justify-between">
-                                        <span className="text-xs font-bold uppercase tracking-[0.2em] text-white/50 group-hover:text-white transition-colors">Start Creating</span>
-                                        <div className="h-10 w-10 border border-white/10 rounded-full flex items-center justify-center group-hover:border-white/40 transition-colors">
-                                            <Zap className="w-4 h-4 text-white/40 group-hover:text-white" />
+                                    <div className="mt-auto pt-6 md:pt-8 flex items-center justify-between">
+                                        <span className="text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-white/50 group-hover:text-white transition-colors">Start Creating</span>
+                                        <div className="h-8 w-8 md:h-10 md:w-10 border border-white/10 rounded-full flex items-center justify-center group-hover:border-white/40 transition-colors">
+                                            <Zap className="w-3 md:w-4 h-3 md:h-4 text-white/40 group-hover:text-white" />
                                         </div>
                                     </div>
                                 </div>
