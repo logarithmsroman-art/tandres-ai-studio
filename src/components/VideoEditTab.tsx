@@ -921,7 +921,7 @@ export default function VideoEditTab({
                                         </div>
                                     </button>
 
-                                    {profile?.subscription_tier === 'free' && (
+                                    {profile?.subscription_tier === 'free' && (profile?.credits || 0) <= 0 && (
                                         <div className="flex flex-col gap-3 mt-4 px-2">
                                             <AdBanner />
                                             <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest text-center">
