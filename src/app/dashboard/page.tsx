@@ -149,7 +149,7 @@ export default function DashboardPage() {
                                     {[
                                         { label: 'YT/IG Limit', val: profile?.subscription_tier === 'pro' ? '2 Hours' : profile?.subscription_tier === 'starter' ? '1 Hour' : '30 Mins' },
                                         { label: 'TikTok Extra', val: profile?.tiktok_extractions_remaining ?? 0 },
-                                        { label: 'Ads Status', val: profile?.subscription_tier !== 'free' ? 'Ad-Free' : 'Ad-Supported' },
+                                        { label: 'Ads Status', val: (profile?.subscription_tier !== 'free' || (profile?.credits || 0) > 0) ? 'Ad-Free' : 'Ad-Supported' },
                                         { label: 'Stack Status', val: nextPlan ? 'Queued' : 'Empty' }
                                     ].map((stat, i) => (
                                         <div key={i} className="p-6 bg-white/[0.03] border border-white/5 rounded-[1.8rem] hover:bg-white/[0.06] transition-all">
