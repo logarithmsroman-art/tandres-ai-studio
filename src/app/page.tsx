@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
-import { Sparkles, Clock, ShieldCheck, Layers, BadgeCheck } from 'lucide-react';
+import { Sparkles, Clock, ShieldCheck, Layers, BadgeCheck, ShoppingBag } from 'lucide-react';
 import AdGate from '@/components/AdGate';
 import Link from 'next/link';
 
@@ -211,7 +211,7 @@ export default function Home() {
                           onClick={() => setIsPaymentOpen(true)}
                           className="bg-white text-black h-9 md:h-12 px-4 md:px-6 rounded-xl md:rounded-2xl shadow-2xl hover:bg-white/90 transition-all active:scale-95 group flex items-center gap-2 uppercase tracking-wider text-[10px] md:text-xs font-black"
                         >
-                          <Zap className="w-3 md:w-3.5 h-3 md:h-3.5 fill-black" />
+                          <ShoppingBag className="w-3.5 md:w-4 h-3.5 md:h-4" />
                           Top Up
                         </button>
                         
