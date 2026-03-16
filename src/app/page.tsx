@@ -395,8 +395,8 @@ export default function Home() {
                 <span className="text-xs font-bold tracking-widest uppercase">Tandres Simplicity AI Studio</span>
               </div>
               <div className="flex items-center gap-8 text-[10px] uppercase font-bold tracking-[0.2em] text-white/20">
-                <a href="#" className="hover:text-white transition-colors">Terms</a>
-                <a href="#" className="hover:text-white transition-colors">Privacy</a>
+                <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
+                <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
                 <span>&copy; 2026 Tandres Simplicity</span>
               </div>
             </footer>
