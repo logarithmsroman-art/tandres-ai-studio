@@ -261,7 +261,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                     </div>
                                 </header>
 
-                                <div className={`grid gap-3 md:gap-4 mb-6 flex-grow overflow-y-auto px-1 md:px-2 py-2 custom-scrollbar ${activeTab === 'credits' ? 'grid-cols-1 xs:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-3 max-w-5xl mx-auto w-full'}`}>
+                                <div className={`mb-6 flex-grow overflow-y-auto px-1 md:px-2 py-2 custom-scrollbar gap-4 ${activeTab === 'credits' ? 'flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-4' : 'flex flex-col md:grid md:grid-cols-3 max-w-5xl mx-auto w-full'}`}>
                                     {currentList.map((pkg) => {
                                         const isLocked = systemLocks.find((l: any) => l.id === pkg.id)?.is_locked;
                                         const isSelected = selectedPack.id === pkg.id;

@@ -679,7 +679,7 @@ export default function VideoEditTab({
                                                     type="text"
                                                     value={pastedUrl}
                                                     onChange={(e) => setPastedUrl(e.target.value)}
-                                                    placeholder="Paste TikTok, YouTube, IG link..."
+                                                    placeholder="Video URL..."
                                                     className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-sm font-medium focus:border-purple-500 focus:bg-zinc-900 outline-none transition-all"
                                                 />
                                             </div>
