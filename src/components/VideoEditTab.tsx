@@ -941,6 +941,7 @@ export default function VideoEditTab({
                                         </div>
                                     </button>
 
+                                    {/* Ads are strictly for Free users with 0 Gold credits */}
                                     {profile?.subscription_tier === 'free' && (profile?.credits || 0) <= 0 && (
                                         <div className="flex flex-col gap-3 mt-4 px-2">
                                             <AdBanner />
