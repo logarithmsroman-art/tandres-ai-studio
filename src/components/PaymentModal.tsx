@@ -166,13 +166,17 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
 
     const handleTabChange = (tab: 'credits' | 'subscriptions') => {
         setActiveTab(tab);
-        if (tab === 'credits') setSelectedPack(CREDIT_PACKS[1]);
-        else setSelectedPack(LAB_SUBSCRIPTIONS[0]);
+        const list = tab === 'credits' ? CREDIT_PACKS : LAB_SUBSCRIPTIONS;
+        // Pick the first UNLOCKED plan as the default
+        const firstUnlocked = list.find(p => !systemLocks.find((l: any) => l.id === p.id && l.is_locked));
+        setSelectedPack(firstUnlocked ?? list[0]);
     };
+
+    const isSelectedLocked = !!systemLocks.find((l: any) => l.id === selectedPack?.id && l.is_locked);
 
     const reference = useMemo(() => {
         return `TR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    }, [selectedPack.id, isOpen]);
+    }, [selectedPack?.id, isOpen]);
 
     const handlePaystackSuccessAction = async (response: any) => {
         setIsVerifying(true);
@@ -323,18 +327,29 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                             </div>
                                         </div>
 
-                                        <PaystackButton
-                                            {...{
-                                                email: userEmail,
-                                                amount: selectedPack.price * 100,
-                                                publicKey,
-                                                text: isVerifying ? "Verifying..." : (activeTab === 'credits' ? "Purchase Gold Pack" : "Activate Full Lab"),
-                                                onSuccess: (res: any) => handlePaystackSuccessAction(res),
-                                                onClose: () => alert('Payment cancelled.'),
-                                                reference,
-                                                className: `h-14 md:h-18 px-8 md:px-12 rounded-xl md:rounded-2xl flex items-center justify-center gap-4 transition-all w-full md:w-auto font-black uppercase tracking-[0.2em] text-[10px] md:text-xs shadow-2xl ${isVerifying ? 'bg-purple-600/50 cursor-not-allowed' : 'bg-white text-black hover:scale-[1.02] active:scale-95'}`
-                                            }}
-                                        />
+                                        <div className="flex flex-col items-center md:items-end gap-2 w-full md:w-auto">
+                                            {isSelectedLocked ? (
+                                                <button
+                                                    disabled
+                                                    className="h-14 md:h-[4.5rem] px-8 md:px-12 rounded-xl md:rounded-2xl flex items-center justify-center gap-3 w-full md:w-auto font-black uppercase tracking-[0.2em] text-[10px] md:text-xs bg-red-500/10 border border-red-500/20 text-red-400 cursor-not-allowed"
+                                                >
+                                                    🔒 Plan Locked — Unavailable
+                                                </button>
+                                            ) : (
+                                                <PaystackButton
+                                                    {...{
+                                                        email: userEmail,
+                                                        amount: selectedPack.price * 100,
+                                                        publicKey,
+                                                        text: isVerifying ? "Verifying..." : (activeTab === 'credits' ? "Purchase Gold Pack" : "Activate Full Lab"),
+                                                        onSuccess: (res: any) => handlePaystackSuccessAction(res),
+                                                        onClose: () => alert('Payment cancelled.'),
+                                                        reference,
+                                                        className: `h-14 md:h-[4.5rem] px-8 md:px-12 rounded-xl md:rounded-2xl flex items-center justify-center gap-4 transition-all w-full md:w-auto font-black uppercase tracking-[0.2em] text-[10px] md:text-xs shadow-2xl ${isVerifying ? 'bg-purple-600/50 cursor-not-allowed' : 'bg-white text-black hover:scale-[1.02] active:scale-95'}`
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="p-8 bg-red-500/5 border border-red-500/10 rounded-[2rem] text-center mt-auto">

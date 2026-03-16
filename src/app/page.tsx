@@ -212,7 +212,7 @@ export default function Home() {
                           className="bg-white text-black h-9 md:h-12 px-4 md:px-6 rounded-xl md:rounded-2xl shadow-2xl hover:bg-white/90 transition-all active:scale-95 group flex items-center gap-2 uppercase tracking-wider text-[10px] md:text-xs font-black"
                         >
                           <Zap className="w-3 md:w-3.5 h-3 md:h-3.5 fill-black" />
-                          <span className="hidden xs:inline">Top Up</span>
+                          Top Up
                         </button>
                         
                         <button

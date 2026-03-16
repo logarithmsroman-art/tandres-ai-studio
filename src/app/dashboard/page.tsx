@@ -173,7 +173,7 @@ export default function DashboardPage() {
                                                 <Layers className="w-6 h-6 animate-pulse" />
                                             </div>
                                             <div>
-                                                <h4 className="text-2xl font-black uppercase italic text-white tracking-tight">{nextPlan.plan_id.replace('_', ' ')}</h4>
+                                                <h4 className="text-2xl font-black uppercase italic text-white tracking-tight">{(nextPlan.plan_id ?? '').replace('_', ' ')}</h4>
                                                 <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Ready for automatic activation</p>
                                             </div>
                                         </div>
