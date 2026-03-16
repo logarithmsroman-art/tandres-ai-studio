@@ -116,45 +116,45 @@ export default function DashboardPage() {
                             }`}>
                                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/5 blur-[100px] -mr-48 -mt-48 pointer-events-none" />
                                 
-                                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-                                    <div className="flex items-center gap-8">
-                                        <div className={`p-8 rounded-[2rem] border shadow-2xl ${
+                                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 md:gap-8">
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-8">
+                                        <div className={`p-5 sm:p-8 rounded-2xl sm:rounded-[2rem] border shadow-2xl ${
                                             profile?.subscription_tier === 'pro' ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' :
                                             profile?.subscription_tier === 'starter' ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
                                             'bg-white/5 border-white/10 text-zinc-600'
                                         }`}>
-                                            <ShieldCheck className="w-10 h-10" />
+                                            <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10" />
                                         </div>
                                         <div>
-                                            <div className="flex items-center gap-4 mb-2">
-                                                <h2 className="text-5xl font-black tracking-tighter uppercase italic">{profile?.subscription_tier || 'Free'} Plan</h2>
-                                                <BadgeCheck className={`w-6 h-6 ${profile?.subscription_tier !== 'free' ? 'text-emerald-400' : 'text-zinc-800'}`} />
+                                            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-2">
+                                                <h2 className="text-4xl sm:text-5xl font-black tracking-tighter uppercase italic">{profile?.subscription_tier || 'Free'} Plan</h2>
+                                                <BadgeCheck className={`w-5 h-5 sm:w-6 sm:h-6 ${profile?.subscription_tier !== 'free' ? 'text-emerald-400' : 'text-zinc-800'}`} />
                                             </div>
-                                            <div className="flex items-center gap-3 text-zinc-500 text-xs font-black uppercase tracking-[0.2em]">
-                                                <Clock className="w-4 h-4" />
+                                            <div className="flex items-center gap-2 sm:gap-3 text-zinc-500 text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] flex-wrap">
+                                                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                                 {profile?.plan_expires_at ? `Expiring on ${new Date(profile.plan_expires_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}` : 'Standard Studio Access'}
                                             </div>
                                         </div>
                                     </div>
 
                                     {profile?.subscription_tier === 'free' && (
-                                        <Link href="/lab" className="px-8 py-4 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 active:scale-95 transition-all">
+                                        <Link href="/lab" className="px-6 py-3 sm:px-8 sm:py-4 bg-white text-black rounded-xl sm:rounded-2xl font-black uppercase tracking-widest text-[10px] sm:text-xs hover:scale-105 active:scale-95 transition-all mt-4 md:mt-0">
                                             Upgrade Lab
                                         </Link>
                                     )}
                                 </div>
 
                                 {/* Plan Benefits Summary */}
-                                <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+                                <div className="mt-8 sm:mt-12 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 relative z-10">
                                     {[
                                         { label: 'YT/IG Limit', val: profile?.subscription_tier === 'pro' ? '2 Hours' : profile?.subscription_tier === 'starter' ? '1 Hour' : '30 Mins' },
                                         { label: 'TikTok Extra', val: profile?.tiktok_extractions_remaining ?? 0 },
                                         { label: 'Ads Status', val: (profile?.subscription_tier !== 'free' || (profile?.credits || 0) > 0) ? 'Ad-Free' : 'Ad-Supported' },
                                         { label: 'Stack Status', val: nextPlan ? 'Queued' : 'Empty' }
                                     ].map((stat, i) => (
-                                        <div key={i} className="p-6 bg-white/[0.03] border border-white/5 rounded-[1.8rem] hover:bg-white/[0.06] transition-all">
-                                            <span className="block text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-2">{stat.label}</span>
-                                            <span className="block text-xl font-black italic">{stat.val}</span>
+                                        <div key={i} className="p-4 sm:p-6 bg-white/[0.03] border border-white/5 rounded-2xl sm:rounded-[1.8rem] hover:bg-white/[0.06] transition-all overflow-hidden">
+                                            <span className="block text-[8px] sm:text-[10px] uppercase font-black tracking-widest text-zinc-500 mb-1.5 sm:mb-2 truncate">{stat.label}</span>
+                                            <span className="block text-lg sm:text-xl font-black italic truncate">{stat.val}</span>
                                         </div>
                                     ))}
                                 </div>

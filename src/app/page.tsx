@@ -183,25 +183,17 @@ export default function Home() {
 
                 <div className="flex items-center gap-2 md:gap-8">
                   {user ? (
-                    <>
-                      <div className="flex items-center gap-2 md:gap-4">
-                        <Link
-                          href="/dashboard"
-                          className="hidden lg:block text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors"
-                        >
-                          Dashboard
-                        </Link>
-
-                        <div className="flex items-center gap-2 md:gap-3 px-3 md:px-6 py-2 md:py-3 bg-[#0a0a0a] border border-white/5 rounded-2xl">
+                      <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                        <div className="flex items-center gap-2 md:gap-3 px-3 md:px-6 py-2 md:py-3 bg-[#0a0a0a] border border-white/5 rounded-2xl shrink-0">
                           <div className="flex items-center gap-1.5 border-r border-white/5 pr-2 md:pr-4">
                             <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                            <span className="text-[8px] md:text-[10px] font-black text-white uppercase tracking-widest leading-none">
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none">
                               {profile?.credits ?? 0} <span className="hidden sm:inline">Gold</span>
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-zinc-600" />
-                            <span className="text-[8px] md:text-[10px] font-black text-white/60 uppercase tracking-widest leading-none">
+                            <span className="text-[10px] font-black text-white/60 uppercase tracking-widest leading-none">
                               {profile?.free_credits ?? 0} <span className="hidden sm:inline">Silver</span>
                             </span>
                           </div>
@@ -209,20 +201,19 @@ export default function Home() {
 
                         <button
                           onClick={() => setIsPaymentOpen(true)}
-                          className="bg-white text-black h-9 md:h-12 px-4 md:px-6 rounded-xl md:rounded-2xl shadow-2xl hover:bg-white/90 transition-all active:scale-95 group flex items-center gap-2 uppercase tracking-wider text-[10px] md:text-xs font-black"
+                          className="bg-white text-black h-10 md:h-12 w-10 md:w-auto md:px-6 rounded-xl md:rounded-2xl shadow-2xl hover:bg-white/90 transition-all active:scale-95 group flex items-center justify-center gap-2 uppercase tracking-wider text-[10px] md:text-xs font-black shrink-0"
                         >
-                          <ShoppingBag className="w-3.5 md:w-4 h-3.5 md:h-4" />
-                          Top Up
+                          <ShoppingBag className="w-4 h-4" />
+                          <span className="hidden md:inline">Top Up</span>
                         </button>
                         
-                        <button
-                          onClick={() => setIsLogoutConfirmOpen(true)}
-                          className="h-9 md:h-12 w-9 md:w-12 border border-white/5 rounded-xl flex items-center justify-center text-white/20 hover:text-white transition-colors"
+                        <Link
+                          href="/dashboard"
+                          className="h-10 md:h-12 w-10 md:w-12 border border-white/5 rounded-xl flex items-center justify-center text-white/40 hover:text-white bg-white/[0.02] hover:bg-white/5 transition-all shrink-0"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                        </button>
+                          <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                        </Link>
                       </div>
-                    </>
                   ) : (
                     <button
                       onClick={() => setIsAuthOpen(true)}
@@ -401,34 +392,7 @@ export default function Home() {
               </div>
             </footer>
 
-            {/* Mobile Bottom Navigation — only shown when logged in on mobile */}
-            {user && (
-              <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-black/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-6 py-3 pb-safe">
-                <Link
-                  href="/dashboard"
-                  className="flex flex-col items-center gap-1.5 text-white/40 hover:text-purple-400 transition-colors group"
-                >
-                  <div className="w-10 h-10 rounded-2xl bg-white/5 group-hover:bg-purple-500/10 flex items-center justify-center transition-all">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                  </div>
-                  <span className="text-[9px] font-black uppercase tracking-widest">Dashboard</span>
-                </Link>
 
-                <button
-                  onClick={() => setIsLogoutConfirmOpen(true)}
-                  className="flex flex-col items-center gap-1.5 text-white/40 hover:text-red-400 transition-colors group"
-                >
-                  <div className="w-10 h-10 rounded-2xl bg-white/5 group-hover:bg-red-500/10 flex items-center justify-center transition-all">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                  </div>
-                  <span className="text-[9px] font-black uppercase tracking-widest">Logout</span>
-                </button>
-              </nav>
-            )}
 
           </motion.div>
         )}

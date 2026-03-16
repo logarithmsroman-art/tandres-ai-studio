@@ -74,7 +74,7 @@ export default function TermsPage() {
                             <ul>
                                 <li>Extract, download, or reproduce copyrighted content without proper authorisation from the rights holder</li>
                                 <li>Process content that involves minors in inappropriate contexts</li>
-                                <li>Create deepfakes or AI-generated media intended to deceive, defame, or harass any individual</li>
+                                <li>Create deepfakes, AI-generated media, or synthetic voices intended to deceive, defame, or harass any individual</li>
                                 <li>Reverse-engineer, scrape, or attempt to access our systems unauthorised</li>
                                 <li>Sell, redistribute, or commercially exploit the Platform's outputs without our written consent</li>
                                 <li>Violate any applicable local or international laws</li>
@@ -82,27 +82,37 @@ export default function TermsPage() {
                             <p>We are not responsible for any third-party content you choose to process using our tools. You bear full legal responsibility for your use of the Platform.</p>
                         </Section>
 
-                        <Section title="6. Copyright and Intellectual Property">
+                        <Section title="6. Voice Cloning Disclaimer">
+                            <p>The AI Voice Cloning tool is provided <strong className="text-white">strictly for educational, entertainment, and personal creative purposes</strong>. By using this feature, you explicitly agree that:</p>
+                            <ul>
+                                <li>You will not use the tool to scam, defraud, or maliciously deceive any individual or organisation.</li>
+                                <li>You will not clone the voice of any individual without their explicit consent, unless for legal parody.</li>
+                                <li>You will not use cloned voices to bypass biometric security systems or commit identity theft.</li>
+                            </ul>
+                            <p>Tandres Simplicity AI Studio bears <strong className="text-red-400">zero liability</strong> for any misuse of the Voice Cloning feature. If you use our technology to scam or impersonate people, you do so entirely at your own legal risk. We reserve the right to permanently ban your account and cooperate with law enforcement if we suspect malicious use.</p>
+                        </Section>
+
+                        <Section title="7. Copyright and Intellectual Property">
                             <p>You retain ownership of any original content you upload. By uploading content, you grant us a non-exclusive, royalty-free licence to process and store that content for the sole purpose of providing the service.</p>
                             <p>The Platform, its design, code, branding, and AI models are the intellectual property of Tandres Simplicity. You may not copy, reproduce, or distribute any part of the Platform without written permission.</p>
                             <p><strong className="text-white">Important:</strong> Many of the content sources our tools can access (e.g., YouTube, TikTok, Instagram) are governed by their own Terms of Service. You are solely responsible for ensuring your use complies with those platforms' rules and applicable copyright law.</p>
                         </Section>
 
-                        <Section title="7. Advertising">
+                        <Section title="8. Advertising">
                             <p>Free-tier users may be shown advertisements powered by Monetag and other ad networks. Users with active Gold Credits or a paid Lab Subscription will not be shown ads.</p>
                             <p>Ad networks may use cookies and device identifiers to deliver relevant ads. See our Privacy Policy for more information.</p>
                         </Section>
 
-                        <Section title="8. Limitation of Liability">
+                        <Section title="9. Limitation of Liability">
                             <p>The Platform is provided "as is" without warranties of any kind. We do not guarantee that the service will be uninterrupted, error-free, or that the AI outputs will meet your expectations.</p>
                             <p>To the fullest extent permitted by law, Tandres Simplicity shall not be liable for any indirect, incidental, or consequential damages arising from your use of the Platform.</p>
                         </Section>
 
-                        <Section title="9. Changes to Terms">
+                        <Section title="10. Changes to Terms">
                             <p>We reserve the right to update these Terms at any time. Continued use of the Platform after any changes constitutes acceptance of the new Terms.</p>
                         </Section>
 
-                        <Section title="10. Contact">
+                        <Section title="11. Contact">
                             <p>For any questions regarding these Terms, contact us at: <strong className="text-purple-400">support@tandresai.online</strong></p>
                         </Section>
                     </div>

@@ -46,7 +46,7 @@ export default function PrivacyPage() {
                             <p><strong className="text-white">Account Information:</strong> When you register, we collect your email address and encrypted password. We do not store your password in plain text.</p>
                             <p><strong className="text-white">Usage Data:</strong> We collect information about how you use the Platform, including which tools you use, how many credits you spend, and your subscription history. This helps us improve the service.</p>
                             <p><strong className="text-white">Uploaded Media:</strong> Audio and video files you upload are stored temporarily for processing only. Files are automatically deleted after processing completes. We do not permanently store your media files beyond what is necessary to deliver the service.</p>
-                            <p><strong className="text-white">Payment Information:</strong> Payments are processed by <strong className="text-white">Paystack</strong>. We do not store your card details. Paystack's Privacy Policy governs your payment data. We only receive a transaction reference and status confirmation.</p>
+                            <p><strong className="text-white">Payment Information:</strong> Payments are processed by our secure third-party payment providers. We do not store your card details directly on our servers. The provider's Privacy Policy governs your payment data. We only receive a transaction reference and status confirmation.</p>
                             <p><strong className="text-white">Device & Technical Data:</strong> We may collect your IP address, browser type, and device identifiers for security, fraud prevention, and analytics purposes.</p>
                         </Section>
 
@@ -65,35 +65,24 @@ export default function PrivacyPage() {
                         </Section>
 
                         <Section title="4. Advertising and Third-Party Ad Networks">
-                            <p>Free-tier users (with zero Gold Credits and no paid subscription) will be shown advertisements through <strong className="text-white">Monetag</strong> and potentially other ad networks.</p>
+                            <p>Free-tier users (with zero Gold Credits and no paid subscription) may be shown advertisements through our partnered ad networks.</p>
                             <p>These ad networks may use cookies, web beacons, and device identifiers to serve ads relevant to your interests. This may involve tracking your browsing behaviour across websites.</p>
                             <p>Users with <strong className="text-white">Gold Credits or a paid Lab Subscription are never shown ads</strong> on the Platform.</p>
                             <p>You can opt out of interest-based advertising through your browser settings or via the ad network's opt-out tools.</p>
                         </Section>
 
                         <Section title="5. Data Storage and Security">
-                            <p>Your account data is stored securely using <strong className="text-white">Supabase</strong>, which provides enterprise-grade encryption at rest and in transit (TLS/SSL).</p>
-                            <p>We implement Row Level Security (RLS) on our database to ensure users can only access their own data. Your credit balance and account details cannot be modified directly from the browser.</p>
+                            <p>Your account data is stored securely using enterprise-grade encrypted databases, providing encryption at rest and in transit (TLS/SSL).</p>
+                            <p>We implement strict database security rules to ensure users can only access their own data. Your credit balance and account details cannot be modified directly from the browser by unauthorised users.</p>
                             <p>While we take security seriously, no system is 100% secure. Please use a strong, unique password for your account.</p>
                         </Section>
 
-                        <Section title="6. Third-Party Services We Use">
-                            <ul>
-                                <li><strong className="text-white">Supabase</strong> — Authentication and database (supabase.com)</li>
-                                <li><strong className="text-white">Paystack</strong> — Payment processing (paystack.com)</li>
-                                <li><strong className="text-white">Monetag</strong> — Advertising network for free users (monetag.com)</li>
-                                <li><strong className="text-white">Vercel</strong> — Hosting and infrastructure (vercel.com)</li>
-                                <li><strong className="text-white">Replicate / ElevenLabs</strong> — AI model APIs for voice and media processing</li>
-                            </ul>
-                            <p>Each of these services has their own privacy policies. We encourage you to review them.</p>
-                        </Section>
-
-                        <Section title="7. Cookies">
+                        <Section title="6. Cookies">
                             <p>We use essential cookies to keep you logged in and maintain your session. Ad networks may set additional cookies for advertising purposes.</p>
                             <p>You can control cookies through your browser settings. Disabling cookies may affect how certain features of the Platform function.</p>
                         </Section>
 
-                        <Section title="8. Your Rights">
+                        <Section title="7. Your Rights">
                             <p>You have the right to:</p>
                             <ul>
                                 <li><strong className="text-white">Access</strong> — Request a copy of the personal data we hold about you</li>
@@ -104,15 +93,15 @@ export default function PrivacyPage() {
                             <p>To exercise these rights, email us at <strong className="text-purple-400">support@tandresai.online</strong>.</p>
                         </Section>
 
-                        <Section title="9. Children's Privacy">
+                        <Section title="8. Children's Privacy">
                             <p>The Platform is not directed at children under 13. We do not knowingly collect personal information from children. If you believe a child has registered, contact us immediately and we will delete the account.</p>
                         </Section>
 
-                        <Section title="10. Changes to This Policy">
+                        <Section title="9. Changes to This Policy">
                             <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by displaying a notice on the Platform. Your continued use after changes constitutes acceptance.</p>
                         </Section>
 
-                        <Section title="11. Contact Us">
+                        <Section title="10. Contact Us">
                             <p>For privacy-related enquiries, contact us at: <strong className="text-purple-400">support@tandresai.online</strong></p>
                         </Section>
 
