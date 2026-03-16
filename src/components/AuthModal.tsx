@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, User, ArrowRight, Github, Chrome } from 'lucide-react';
+import { X, Mail, Lock, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Logo from '@/components/Logo';
 
@@ -138,22 +138,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                                     </button>
                                 </form>
 
-                                <div className="mt-8 flex items-center gap-4 text-white/10">
-                                    <div className="h-[1px] flex-grow bg-white/5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">OR</span>
-                                    <div className="h-[1px] flex-grow bg-white/5" />
-                                </div>
 
-                                <div className="mt-8 grid grid-cols-2 gap-4">
-                                    <button className="h-14 bg-white/[0.03] border border-white/5 rounded-2xl flex items-center justify-center gap-3 hover:bg-white/[0.06] transition-all group">
-                                        <Chrome className="w-4 h-4 text-white/40 group-hover:text-white" />
-                                        <span className="text-xs font-bold">Google</span>
-                                    </button>
-                                    <button className="h-14 bg-white/[0.03] border border-white/5 rounded-2xl flex items-center justify-center gap-3 hover:bg-white/[0.06] transition-all group">
-                                        <Github className="w-4 h-4 text-white/40 group-hover:text-white" />
-                                        <span className="text-xs font-bold">GitHub</span>
-                                    </button>
-                                </div>
 
                                 <p className="mt-10 text-center text-xs text-white/30">
                                     {isLogin ? "Don't have an account?" : "Already have an account?"}{' '}

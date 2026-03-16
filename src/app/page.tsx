@@ -397,10 +397,39 @@ export default function Home() {
               <div className="flex items-center gap-8 text-[10px] uppercase font-bold tracking-[0.2em] text-white/20">
                 <a href="#" className="hover:text-white transition-colors">Terms</a>
                 <a href="#" className="hover:text-white transition-colors">Privacy</a>
-                <a href="#" className="hover:text-white transition-colors">API Docs</a>
                 <span>&copy; 2026 Tandres Simplicity</span>
               </div>
             </footer>
+
+            {/* Mobile Bottom Navigation — only shown when logged in on mobile */}
+            {user && (
+              <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-black/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-6 py-3 pb-safe">
+                <Link
+                  href="/dashboard"
+                  className="flex flex-col items-center gap-1.5 text-white/40 hover:text-purple-400 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-white/5 group-hover:bg-purple-500/10 flex items-center justify-center transition-all">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Dashboard</span>
+                </Link>
+
+                <button
+                  onClick={() => setIsLogoutConfirmOpen(true)}
+                  className="flex flex-col items-center gap-1.5 text-white/40 hover:text-red-400 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-white/5 group-hover:bg-red-500/10 flex items-center justify-center transition-all">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest">Logout</span>
+                </button>
+              </nav>
+            )}
+
           </motion.div>
         )}
       </AnimatePresence>
