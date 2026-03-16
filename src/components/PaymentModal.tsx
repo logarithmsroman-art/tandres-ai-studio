@@ -271,7 +271,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                                 key={pkg.id}
                                                 disabled={isLocked}
                                                 onClick={() => setSelectedPack(pkg)}
-                                                className={`relative group flex flex-col rounded-[1.5rem] md:rounded-[2rem] border transition-all duration-500 text-left h-full overflow-hidden ${isSelected ? 'bg-white/[0.08] border-white/20 ring-1 ring-white/10' : 'bg-white/[0.01] border-white/[0.05] opacity-80'} ${isLocked ? 'grayscale opacity-30 cursor-not-allowed' : 'hover:opacity-100'}`}
+                                                className={`relative group flex flex-col shrink-0 md:h-full rounded-[1.5rem] md:rounded-[2rem] border transition-all duration-500 text-left overflow-hidden ${isSelected ? 'bg-white/[0.08] border-white/20 ring-1 ring-white/10' : 'bg-white/[0.01] border-white/[0.05] opacity-80'} ${isLocked ? 'grayscale opacity-30 cursor-not-allowed' : 'hover:opacity-100'}`}
                                             >
                                                 <div className={`h-1 w-full bg-gradient-to-r ${pkg.color} absolute top-0 left-0 opacity-40`} />
                                                 
