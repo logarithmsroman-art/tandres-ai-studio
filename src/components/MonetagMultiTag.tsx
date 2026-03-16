@@ -1,7 +1,9 @@
 'use client';
+import 'client-only';
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import Script from 'next/script';
 
 export default function MonetagMultiTag() {
     // null = still checking, true = show ads, false = hide ads
@@ -46,23 +48,14 @@ export default function MonetagMultiTag() {
         return () => subscription.unsubscribe();
     }, []);
 
-    useEffect(() => {
-        // CRITICAL: Only act once we have a DEFINITE answer (not null)
-        // This ensures the script is NEVER injected before we know the user's status
-        if (shouldShowAds === null) return;
+    if (shouldShowAds === null || shouldShowAds === false) return null;
 
-        if (shouldShowAds === true && typeof window !== 'undefined' && !document.getElementById('monetag-script')) {
-            // User confirmed free/no-credits → inject ad script
-            const script = document.createElement('script');
-            script.id = 'monetag-script';
-            script.innerHTML = `(function(s,u,z,p){s.src=u,s.setAttribute('data-zone',z),p.appendChild(s);})(document.createElement('script'),'https://nap5k.com/tag.min.js',10730532,document.body||document.documentElement)`;
-            document.head.appendChild(script);
-        } else if (shouldShowAds === false) {
-            // User has credits or paid sub → remove ad script if it somehow got in
-            const existingScript = document.getElementById('monetag-script');
-            if (existingScript) existingScript.remove();
-        }
-    }, [shouldShowAds]);
-
-    return null;
+    return (
+        <Script
+            id="monetag-multitag"
+            src="https://nap5k.com/tag.min.js"
+            data-zone="10730532"
+            strategy="afterInteractive"
+        />
+    );
 }
