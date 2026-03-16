@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic';
 import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
-import { Sparkles, Clock, ShieldCheck, Layers, BadgeCheck, ShoppingBag } from 'lucide-react';
+import { Sparkles, Clock, ShieldCheck, Layers, BadgeCheck, ShoppingBag, Menu, X, LayoutDashboard, FileText, Book, LogOut } from 'lucide-react';
 import AdGate from '@/components/AdGate';
 import Link from 'next/link';
 
@@ -32,6 +32,7 @@ export default function Home() {
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [showAdForCredits, setShowAdForCredits] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -209,10 +210,17 @@ export default function Home() {
                         
                         <Link
                           href="/dashboard"
-                          className="h-10 md:h-12 w-10 md:w-12 border border-white/5 rounded-xl flex items-center justify-center text-white/40 hover:text-white bg-white/[0.02] hover:bg-white/5 transition-all shrink-0"
+                          className="hidden md:flex h-10 md:h-12 w-10 md:w-12 border border-white/5 rounded-xl items-center justify-center text-white/40 hover:text-white bg-white/[0.02] hover:bg-white/5 transition-all shrink-0"
                         >
                           <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                         </Link>
+
+                        <button
+                          onClick={() => setIsMobileMenuOpen(true)}
+                          className="md:hidden h-10 w-10 border border-white/5 rounded-xl flex items-center justify-center text-white/40 hover:text-white bg-white/[0.02] hover:bg-white/5 transition-all shrink-0"
+                        >
+                          <Menu className="w-4 h-4" />
+                        </button>
                       </div>
                   ) : (
                     <button
@@ -377,6 +385,59 @@ export default function Home() {
                       </div>
                     </motion.div>
                   </div>
+                </>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {isMobileMenuOpen && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md lg:hidden"
+                  />
+                  <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="fixed top-0 right-0 bottom-0 w-72 bg-[#0a0a0a] border-l border-white/5 z-[101] shadow-2xl flex flex-col lg:hidden"
+                  >
+                    <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Menu</span>
+                      <button onClick={() => setIsMobileMenuOpen(false)} className="text-white/40 hover:text-white p-2 bg-white/5 rounded-lg border border-white/5">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="p-4 flex-grow flex flex-col gap-2">
+                        <Link onClick={() => setIsMobileMenuOpen(false)} href="/dashboard" className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors group">
+                           <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center"><LayoutDashboard className="w-5 h-5" /></div>
+                           <span className="text-xs font-bold uppercase tracking-widest">Dashboard</span>
+                        </Link>
+                        <button onClick={() => { setIsMobileMenuOpen(false); setIsPaymentOpen(true); }} className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors group text-left w-full">
+                           <div className="w-10 h-10 rounded-xl bg-yellow-500/10 text-yellow-500 flex items-center justify-center"><ShoppingBag className="w-5 h-5" /></div>
+                           <span className="text-xs font-bold uppercase tracking-widest">Store / Top Up</span>
+                        </button>
+                        <Link onClick={() => setIsMobileMenuOpen(false)} href="/terms" className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors group">
+                           <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center"><FileText className="w-5 h-5" /></div>
+                           <span className="text-xs font-bold uppercase tracking-widest">Terms of Service</span>
+                        </Link>
+                        <Link onClick={() => setIsMobileMenuOpen(false)} href="/privacy" className="flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-colors group">
+                           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center"><Book className="w-5 h-5" /></div>
+                           <span className="text-xs font-bold uppercase tracking-widest">Privacy Policy</span>
+                        </Link>
+
+                        <div className="mt-auto">
+                            <button onClick={() => { setIsMobileMenuOpen(false); setIsLogoutConfirmOpen(true); }} className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-red-500/10 transition-colors group text-left">
+                                <div className="w-10 h-10 rounded-xl bg-red-500/5 text-red-500 flex items-center justify-center group-hover:bg-red-500/20"><LogOut className="w-5 h-5" /></div>
+                                <span className="text-xs font-bold uppercase tracking-widest text-red-500">Sign Out</span>
+                            </button>
+                        </div>
+                    </div>
+                  </motion.div>
                 </>
               )}
             </AnimatePresence>
