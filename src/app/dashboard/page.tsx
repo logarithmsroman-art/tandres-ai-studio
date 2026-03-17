@@ -224,16 +224,7 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <Link href="/" className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center gap-3 hover:bg-white/10 transition-colors">
-                                        <Zap className="w-5 h-5 text-purple-400" />
-                                        <span className="text-[8px] font-black uppercase tracking-widest">Top Up</span>
-                                    </Link>
-                                    <Link href="/" className="p-5 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center gap-3 hover:bg-white/10 transition-colors">
-                                        <History className="w-5 h-5 text-blue-400" />
-                                        <span className="text-[8px] font-black uppercase tracking-widest">History</span>
-                                    </Link>
-                                </div>
+
                             </section>
 
                             <button
