@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,6 +19,20 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.png",
     apple: "/logo.png",
+  },
+  openGraph: {
+    title: "Tandres Simplicity AI Studio",
+    description: "Next-gen AI media tools for content creators.",
+    url: "https://tandresai.online",
+    siteName: "Tandres Simplicity AI Studio",
+    images: [{ url: "/logo.png" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Tandres Simplicity AI Studio",
+    description: "Next-gen AI media tools for content creators.",
+    images: ["/logo.png"],
   },
 };
 
