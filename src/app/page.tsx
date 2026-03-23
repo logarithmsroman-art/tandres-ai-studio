@@ -33,6 +33,17 @@ export default function Home() {
   const [features, setFeatures] = useState<FeatureFlags>({ showSilver: false });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Fire-and-forget visitor tracking
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      fetch('/api/track-visit', { method: 'POST', headers }).catch(() => {});
+    });
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);

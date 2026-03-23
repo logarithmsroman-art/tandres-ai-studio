@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Unlock, MessageSquare, Save, Terminal, ShieldAlert, Cpu, Zap, CreditCard, LayoutDashboard, Eye } from 'lucide-react';
+import { Lock, Unlock, MessageSquare, Save, Terminal, ShieldAlert, Cpu, Zap, CreditCard, LayoutDashboard, Eye, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const TOOLS = [
     { id: 'audio_link', name: 'Audio Link Extraction', sub: 'Pasted URL' },
@@ -114,13 +115,22 @@ export default function AdminLocks() {
                         </p>
                     </div>
                     
-                    <div className="flex items-center gap-6 px-6 md:px-8 py-4 bg-zinc-900/50 border border-white/5 rounded-[2rem] backdrop-blur-3xl">
-                        <div className="text-right">
-                            <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-1">Status</p>
-                            <p className="text-xs font-black uppercase text-green-400">Live & Secure</p>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                        <Link
+                            href="/admin/visitors"
+                            className="flex items-center gap-3 px-6 py-4 bg-blue-500/10 border border-blue-500/20 rounded-[2rem] hover:bg-blue-500/20 transition-all"
+                        >
+                            <Users className="w-5 h-5 text-blue-400" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Visitor Analytics</span>
+                        </Link>
+                        <div className="flex items-center gap-6 px-6 md:px-8 py-4 bg-zinc-900/50 border border-white/5 rounded-[2rem] backdrop-blur-3xl">
+                            <div className="text-right">
+                                <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mb-1">Status</p>
+                                <p className="text-xs font-black uppercase text-green-400">Live & Secure</p>
+                            </div>
+                            <div className="h-10 w-[1px] bg-white/5" />
+                            <Zap className="w-5 h-5 text-purple-500 animate-pulse" />
                         </div>
-                        <div className="h-10 w-[1px] bg-white/5" />
-                        <Zap className="w-5 h-5 text-purple-500 animate-pulse" />
                     </div>
                 </header>
 
