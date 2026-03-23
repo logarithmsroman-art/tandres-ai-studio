@@ -272,7 +272,7 @@ export default function VoiceCloneTab({ userId, onSuccess }: VoiceCloneTabProps)
                             <div className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-[ping_1.5s_infinite_0.6s]" />
                         </div>
                         <h4 className="text-xl font-bold tracking-tight">Generating your voice...</h4>
-                        <p className="text-white/30 text-sm max-w-sm">Please wait while we process your audio. This usually takes 10-30 seconds.</p>
+                        <p className="text-white/30 text-sm max-w-sm">Please wait while we process your audio. This can take 90 seconds or more.</p>
                     </motion.div>
                 )}
 

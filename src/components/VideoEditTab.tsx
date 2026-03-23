@@ -11,7 +11,6 @@ import {
     Globe, Pause, SkipForward, Flag, Sparkles, ArrowLeft, Crown
 } from 'lucide-react';
 import LabSubscriptions from './LabSubscriptions';
-import AdBanner from './AdBanner';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
@@ -188,7 +187,12 @@ export default function VideoEditTab({
         if (!pastedUrl) return;
 
         // Check for locks
-        const lockId = currentTool === 'audio-extractor' ? 'audio_link' : 'video_link';
+        const lockId = currentTool === 'audio-extractor'
+            ? (selectedFiles.length > 0 ? 'audio_upload' : 'audio_link')
+            : currentTool === 'video-extractor' ? 'video_link'
+            : currentTool === 'trimmer' ? 'audio_trimmer'
+            : currentTool === 'joiner' ? 'audio_joiner'
+            : currentTool.replace('-', '_');
         const lock = systemLocks.find(l => l.id === lockId);
         if (lock?.is_locked) {
             setError(lock.lock_message || "This tool is under maintenance.");
@@ -431,7 +435,8 @@ export default function VideoEditTab({
                 return;
             }
         } catch (e) {
-            console.warn("Lock check failed, proceeding with caution.");
+            setError("Studio tools are temporarily unavailable. Please try again.");
+            return;
         }
 
         // 2. Optimized Flow: No more blocking AdGate for Free Tier.
@@ -941,15 +946,6 @@ export default function VideoEditTab({
                                         </div>
                                     </button>
 
-                                    {/* Ads are strictly for Free users with 0 Gold credits */}
-                                    {profile?.subscription_tier === 'free' && (profile?.credits || 0) <= 0 && (
-                                        <div className="flex flex-col gap-3 mt-4 px-2">
-                                            <AdBanner />
-                                            <p className="text-[9px] text-white/20 font-bold uppercase tracking-widest text-center">
-                                                Support the studio by keeping ads active. Thank you!
-                                            </p>
-                                        </div>
-                                    )}
                                 </div>
 
                                 {/* Progress Visualizer */}

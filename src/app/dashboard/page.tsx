@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
+import { getFeatureFlags, FeatureFlags } from '@/lib/featureFlags';
 import { User } from '@supabase/supabase-js';
 import { 
     Clock, ShieldCheck, Layers, BadgeCheck, 
@@ -24,6 +25,7 @@ export default function DashboardPage() {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [nextPlan, setNextPlan] = useState<any>(null);
+    const [features, setFeatures] = useState<FeatureFlags>({ showSilver: false });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -56,6 +58,9 @@ export default function DashboardPage() {
             .order('created_at', { ascending: true })
             .limit(1);
         if (queueData && queueData.length > 0) setNextPlan(queueData[0]);
+
+        const flags = await getFeatureFlags(supabase);
+        setFeatures(flags);
     };
 
     if (loading) return (
@@ -214,6 +219,7 @@ export default function DashboardPage() {
                                     </div>
 
                                     {/* Silver Hub */}
+                                    {features.showSilver && (
                                     <div className="p-8 bg-zinc-900/50 border border-white/5 rounded-[2.5rem] relative overflow-hidden">
                                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 block mb-4">Silver Credits</span>
                                         <div className="text-6xl font-black italic tracking-tighter text-white/50 mb-2">{profile?.free_credits ?? 0}</div>
@@ -222,6 +228,7 @@ export default function DashboardPage() {
                                             Permanent Ad-Skipping Balance
                                         </p>
                                     </div>
+                                    )}
                                 </div>
 
 

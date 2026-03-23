@@ -14,7 +14,7 @@ export default function UnifiedMediaStudio({ userId }: UnifiedMediaStudioProps) 
             id: 'voice-clone',
             href: '/voice-clone',
             title: 'AI Voice Clone',
-            description: 'Clone any human voice with high fidelity using Fish Speech v1.5.',
+            description: 'Capture and replicate any human voice with studio-grade AI precision.',
             icon: <Mic className="w-8 h-8" />,
             color: 'from-purple-600 to-indigo-600',
             glow: 'rgba(147, 51, 234, 0.4)',

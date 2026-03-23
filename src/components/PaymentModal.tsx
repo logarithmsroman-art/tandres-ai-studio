@@ -14,6 +14,7 @@ interface PaymentModalProps {
     userId: string;
     onSuccess: () => void;
     currentTier?: string;
+    showSilver?: boolean;
 }
 
 const CREDIT_PACKS = [
@@ -148,7 +149,7 @@ const LAB_SUBSCRIPTIONS = [
     }
 ];
 
-export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuccess, currentTier = 'free' }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuccess, currentTier = 'free', showSilver = false }: PaymentModalProps) {
     const [activeTab, setActiveTab] = useState<'credits' | 'subscriptions'>('credits');
     const [selectedPack, setSelectedPack] = useState<any>(CREDIT_PACKS[1]);
     const [isVerifying, setIsVerifying] = useState(false);
@@ -166,7 +167,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
 
     const handleTabChange = (tab: 'credits' | 'subscriptions') => {
         setActiveTab(tab);
-        const list = tab === 'credits' ? CREDIT_PACKS : LAB_SUBSCRIPTIONS;
+        const list = tab === 'credits' ? CREDIT_PACKS : (showSilver ? LAB_SUBSCRIPTIONS : LAB_SUBSCRIPTIONS.filter(p => p.type !== 'silver_credits'));
         // Pick the first UNLOCKED plan as the default
         const firstUnlocked = list.find(p => !systemLocks.find((l: any) => l.id === p.id && l.is_locked));
         setSelectedPack(firstUnlocked ?? list[0]);
@@ -212,7 +213,10 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
         }
     };
 
-    const currentList = activeTab === 'credits' ? CREDIT_PACKS : LAB_SUBSCRIPTIONS;
+    const visibleSubscriptions = showSilver
+        ? LAB_SUBSCRIPTIONS
+        : LAB_SUBSCRIPTIONS.filter(p => p.type !== 'silver_credits');
+    const currentList = activeTab === 'credits' ? CREDIT_PACKS : visibleSubscriptions;
 
     return (
         <AnimatePresence>

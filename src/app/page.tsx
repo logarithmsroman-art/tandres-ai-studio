@@ -9,8 +9,8 @@ import Logo from '@/components/Logo';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { Sparkles, Clock, ShieldCheck, Layers, BadgeCheck, ShoppingBag, Menu, X, LayoutDashboard, FileText, Book, LogOut } from 'lucide-react';
-import AdGate from '@/components/AdGate';
 import Link from 'next/link';
+import { getFeatureFlags, FeatureFlags } from '@/lib/featureFlags';
 
 const PaymentModal = dynamic(() => import('@/components/PaymentModal'), { ssr: false });
 
@@ -30,7 +30,7 @@ export default function Home() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
-  const [showAdForCredits, setShowAdForCredits] = useState(false);
+  const [features, setFeatures] = useState<FeatureFlags>({ showSilver: false });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -80,6 +80,10 @@ export default function Home() {
     if (!profError && profData) {
       setProfile(profData);
     }
+
+    // 2. Fetch Feature Flags
+    const flags = await getFeatureFlags(supabase);
+    setFeatures(flags);
 
     // 2. Fetch Next Queued Plan (for Dashboard trust)
     const { data: queueData } = await supabase
@@ -198,12 +202,14 @@ export default function Home() {
                               {profile?.credits ?? 0} <span className="hidden sm:inline">Gold</span>
                             </span>
                           </div>
+                          {features.showSilver && (
                           <div className="flex items-center gap-1.5">
                             <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-zinc-600" />
                             <span className="text-[10px] font-black text-white/60 uppercase tracking-widest leading-none">
                               {profile?.free_credits ?? 0} <span className="hidden sm:inline">Silver</span>
                             </span>
                           </div>
+                          )}
                         </div>
 
                         <button
@@ -338,6 +344,7 @@ export default function Home() {
                 userId={user.id}
                 currentTier={profile?.subscription_tier}
                 onSuccess={() => fetchProfile(user.id)}
+                showSilver={features.showSilver}
               />
             )}
 

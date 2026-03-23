@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Unlock, MessageSquare, Save, Terminal, ShieldAlert, Cpu, Zap, CreditCard, LayoutDashboard } from 'lucide-react';
+import { Lock, Unlock, MessageSquare, Save, Terminal, ShieldAlert, Cpu, Zap, CreditCard, LayoutDashboard, Eye } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -13,6 +13,10 @@ const TOOLS = [
     { id: 'audio_trimmer', name: 'Audio Trimmer', sub: 'Processing' },
     { id: 'audio_joiner', name: 'Audio Joiner', sub: 'Processing' },
     { id: 'magic_sync', name: 'Magic Sync', sub: 'AI Video/Audio' }
+];
+
+const FEATURE_FLAGS = [
+    { id: 'feature_silver', name: 'Silver Credits', sub: 'Site Visibility' },
 ];
 
 const REVENUE_PLANS = [
@@ -138,6 +142,36 @@ export default function AdminLocks() {
                                 onToggle={() => handleToggle(tool.id, isLocked)}
                                 onMessageChange={(msg: string) => handleMessageChange(tool.id, msg)}
                                 onSave={() => saveLock(tool.id)}
+                            />
+                        );
+                    })}
+                </div>
+
+                {/* Feature Visibility Section */}
+                <div className="flex items-center gap-4 mb-8 mt-16">
+                    <Eye className="w-5 h-5 text-emerald-400" />
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40">Feature Visibility</h2>
+                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Unlocked = visible on site</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-20">
+                    {FEATURE_FLAGS.map((feature) => {
+                        const lockData = locks.find(l => l.id === feature.id) || { id: feature.id, is_locked: true, lock_message: '' };
+                        const isLocked = lockData.is_locked;
+
+                        return (
+                            <AdminCard
+                                key={feature.id}
+                                id={feature.id}
+                                name={feature.name}
+                                sub={feature.sub}
+                                isLocked={isLocked}
+                                lockMessage={lockData.lock_message}
+                                isSaving={isSaving === feature.id}
+                                onToggle={() => handleToggle(feature.id, isLocked)}
+                                onMessageChange={(msg: string) => handleMessageChange(feature.id, msg)}
+                                onSave={() => saveLock(feature.id)}
+                                compact
                             />
                         );
                     })}
