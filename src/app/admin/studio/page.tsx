@@ -78,7 +78,12 @@ export default function AdminLocks() {
     };
 
     const saveLock = async (id: string) => {
-        const lock = locks.find(l => l.id === id) || { id, is_locked: false, lock_message: '' };
+        const allItems = [...TOOLS, ...REVENUE_PLANS, ...FEATURE_FLAGS];
+        const meta = allItems.find(i => i.id === id);
+        const existing = locks.find(l => l.id === id);
+        const lock = existing
+            ? { ...existing, name: existing.name ?? meta?.name ?? id }
+            : { id, name: meta?.name ?? id, is_locked: false, lock_message: '' };
         setIsSaving(id);
         const { error } = await supabase.from('system_locks').upsert(lock);
         if (error) alert('Error saving: ' + error.message);

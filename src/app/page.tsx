@@ -31,16 +31,7 @@ export default function Home() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [features, setFeatures] = useState<FeatureFlags>({ showSilver: false });
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -162,18 +153,12 @@ export default function Home() {
             className="flex flex-col min-h-screen"
           >
             {/* Header / Navbar */}
-            <nav className="fixed top-0 left-0 right-0 z-40 border-b border-white/5 bg-black/40 backdrop-blur-3xl">
+            <nav className="fixed top-0 left-0 right-0 z-40 border-b border-white/5 bg-black/60 backdrop-blur-md">
               <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
                 <div className="flex items-center gap-4 group cursor-pointer">
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.05, 1],
-                      filter: ['drop-shadow(0 0 0px rgba(168,85,247,0))', 'drop-shadow(0 0 15px rgba(168,85,247,0.4))', 'drop-shadow(0 0 0px rgba(168,85,247,0))']
-                    }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  >
+                  <div style={{ filter: 'drop-shadow(0 0 8px rgba(168,85,247,0.3))' }}>
                     <Logo size="sm" glow={false} />
-                  </motion.div>
+                  </div>
                   <div className="flex flex-col">
                     <span className="font-bold tracking-tight text-white/90 leading-none group-hover:text-white transition-colors text-sm md:text-base">Tandres Simplicity</span>
                     <motion.span
@@ -243,37 +228,11 @@ export default function Home() {
 
             {/* Dashboard Content */}
             <div className="flex-grow pt-32 pb-20 px-8 relative overflow-hidden">
-              {/* Persistent Floating Blobs */}
+              {/* Static Background Blobs */}
               <div className="absolute inset-0 pointer-events-none z-0">
-                <motion.div
-                  animate={{
-                    x: [0, 100, -50, 0],
-                    y: [0, -50, 100, 0],
-                    scale: [1, 1.2, 0.9, 1]
-                  }}
-                  transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                  className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-purple-600/5 blur-[120px] rounded-full"
-                />
-                <motion.div
-                  animate={{
-                    x: [0, -120, 80, 0],
-                    y: [0, 100, -60, 0],
-                    scale: [1, 0.8, 1.1, 1]
-                  }}
-                  transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                  className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-blue-600/5 blur-[150px] rounded-full"
-                />
+                <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-purple-600/5 blur-[120px] rounded-full" />
+                <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full" />
               </div>
-
-              {/* Dynamic Mouse Glow */}
-              <motion.div
-                className="fixed pointer-events-none z-10 w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full"
-                animate={{
-                  x: mousePos.x - 300,
-                  y: mousePos.y - 300,
-                }}
-                transition={{ type: 'spring', damping: 50, stiffness: 200, mass: 0.5 }}
-              />
 
               <header className="mb-24 text-center max-w-4xl mx-auto relative z-20">
                 <motion.div

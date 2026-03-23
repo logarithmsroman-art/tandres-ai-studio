@@ -10,7 +10,7 @@ export async function getFeatureFlags(supabase: SupabaseClient): Promise<Feature
         .select('id, is_locked')
         .in('id', ['feature_silver']);
 
-    const isLocked = (id: string) => data?.find((r: any) => r.id === id)?.is_locked ?? false;
+    const isLocked = (id: string) => data?.find((r: any) => r.id === id)?.is_locked ?? true;
 
     return {
         showSilver: !isLocked('feature_silver'),
