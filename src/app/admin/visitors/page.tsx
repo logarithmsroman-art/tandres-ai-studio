@@ -112,18 +112,18 @@ export default function AdminVisitors() {
 
     const fetchVisits = async (dateStr: string) => {
         setFetching(true);
-        const start = `${dateStr}T00:00:00.000Z`;
-        const end = `${dateStr}T23:59:59.999Z`;
+        // Use date prefix filter — matches any timestamp that starts with the selected date
+        const nextDay = toDateString(new Date(new Date(dateStr + 'T12:00:00').getTime() + 86400000));
 
         const { data, error } = await supabase
             .from('visitor_logs')
             .select('*')
-            .gte('created_at', start)
-            .lte('created_at', end)
+            .gte('created_at', `${dateStr}T00:00:00`)
+            .lt('created_at', `${nextDay}T00:00:00`)
             .order('created_at', { ascending: false });
 
         if (data) setVisits(data);
-        else if (error) console.error('[admin/visitors] fetch error:', error);
+        else if (error) console.error('[admin/visitors] fetch error:', error.message, error.details, error.hint);
         setLoading(false);
         setFetching(false);
     };
