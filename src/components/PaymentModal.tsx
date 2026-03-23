@@ -23,13 +23,13 @@ const CREDIT_PACKS = [
         credits: 10,
         price: 1500,
         label: 'Starter Gold',
-        description: 'Elite cloning entry.',
+        description: 'Perfect for getting started.',
         features: [
             '10 Gold Credits',
-            'Essential AI',
-            'Permanent Storage',
-            'No Expiry',
-            '24/7 Support'
+            '10 Voice Clone Generations',
+            'Studio-Grade AI Quality',
+            'Credits Never Expire',
+            'Full Studio Access'
         ],
         icon: <Zap className="w-6 h-6 text-purple-400" />,
         type: 'credit',
@@ -40,13 +40,13 @@ const CREDIT_PACKS = [
         credits: 20,
         price: 3000,
         label: 'Creator Gold',
-        description: 'Content creator balance.',
+        description: 'Great for regular creators.',
         features: [
             '20 Gold Credits',
-            'High-Priority',
-            'Studio Accuracy',
-            'Permanent Storage',
-            'Commercial Rights'
+            '20 Voice Clone Generations',
+            'Studio-Grade AI Quality',
+            'Credits Never Expire',
+            'Full Studio Access'
         ],
         icon: <Zap className="w-6 h-6 text-indigo-400" />,
         popular: true,
@@ -58,13 +58,13 @@ const CREDIT_PACKS = [
         credits: 50,
         price: 7500,
         label: 'Studio Gold',
-        description: 'High-volume studio work.',
+        description: 'Built for high-volume work.',
         features: [
             '50 Gold Credits',
-            'Ultra-Priority',
-            'Agency Rights',
-            'Advanced Modulation',
-            'White-Label'
+            '50 Voice Clone Generations',
+            'Studio-Grade AI Quality',
+            'Credits Never Expire',
+            'Full Studio Access'
         ],
         icon: <Zap className="w-6 h-6 text-blue-400" />,
         type: 'credit',
@@ -75,13 +75,13 @@ const CREDIT_PACKS = [
         credits: 150,
         price: 15000,
         label: 'Elite Gold',
-        description: 'Agency power pack.',
+        description: 'Maximum credits, best value.',
         features: [
             '150 Gold Credits',
-            'Zero Limits',
-            'Fastest Speed',
-            'One-Time Buy',
-            'Dedicated Pipe'
+            '150 Voice Clone Generations',
+            'Studio-Grade AI Quality',
+            'Credits Never Expire',
+            'Full Studio Access'
         ],
         icon: <Zap className="w-6 h-6 text-yellow-400" />,
         type: 'credit',
@@ -309,8 +309,30 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                                         ))}
                                                     </div>
 
-                                                    <div className={`mt-auto w-full h-11 rounded-xl border flex items-center justify-center tracking-[0.2em] font-black text-[9px] uppercase transition-all ${isSelected ? 'bg-white text-black border-transparent shadow-lg' : 'bg-transparent border-white/10 text-white/30'}`}>
+                                                    <div className={`hidden md:flex mt-auto w-full h-11 rounded-xl border items-center justify-center tracking-[0.2em] font-black text-[9px] uppercase transition-all ${isSelected ? 'bg-white text-black border-transparent shadow-lg' : 'bg-transparent border-white/10 text-white/30'}`}>
                                                         {isSelected ? 'Secure Pack' : 'Select'}
+                                                    </div>
+
+                                                    {/* Mobile-only buy button */}
+                                                    <div className="md:hidden mt-3">
+                                                        {isLocked ? (
+                                                            <div className="w-full py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-black uppercase tracking-widest text-[9px] flex items-center justify-center gap-2">
+                                                                🔒 Locked
+                                                            </div>
+                                                        ) : (
+                                                            <PaystackButton
+                                                                {...{
+                                                                    email: userEmail,
+                                                                    amount: pkg.price * 100,
+                                                                    publicKey,
+                                                                    text: isVerifying && selectedPack.id === pkg.id ? 'Verifying...' : `Buy · ₦${pkg.price.toLocaleString()}`,
+                                                                    onSuccess: (res: any) => { setSelectedPack(pkg); handlePaystackSuccessAction(res); },
+                                                                    onClose: () => alert('Payment cancelled.'),
+                                                                    reference: `TR-${pkg.id}-${Date.now()}`,
+                                                                    className: `w-full py-3 rounded-xl font-black uppercase tracking-widest text-[9px] flex items-center justify-center transition-all ${isVerifying && selectedPack.id === pkg.id ? 'bg-purple-600/50 cursor-not-allowed text-white' : 'bg-white text-black hover:opacity-90 active:scale-95'}`
+                                                                }}
+                                                            />
+                                                        )}
                                                     </div>
                                                 </div>
                                             </button>
@@ -319,7 +341,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                 </div>
 
                                 {userId ? (
-                                    <div className="p-6 md:p-8 bg-white/[0.03] border border-white/10 rounded-[2rem] md:rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 shrink-0 shadow-2xl mt-auto">
+                                    <div className="hidden md:flex p-6 md:p-8 bg-white/[0.03] border border-white/10 rounded-[2rem] md:rounded-[2.5rem] flex-col md:flex-row items-center justify-between gap-6 md:gap-8 shrink-0 shadow-2xl mt-auto">
                                         <div className="flex flex-col gap-1 text-center md:text-left">
                                             <div className="flex items-center justify-center md:justify-start gap-2 mb-1 opacity-40">
                                                 <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -356,7 +378,7 @@ export default function PaymentModal({ isOpen, onClose, userEmail, userId, onSuc
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="p-8 bg-red-500/5 border border-red-500/10 rounded-[2rem] text-center mt-auto">
+                                    <div className="hidden md:block p-8 bg-red-500/5 border border-red-500/10 rounded-[2rem] text-center mt-auto">
                                         <p className="text-red-400 font-black uppercase tracking-widest text-[10px]">Active Session Required for Checkout</p>
                                     </div>
                                 )}
