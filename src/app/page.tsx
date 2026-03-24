@@ -230,7 +230,7 @@ export default function Home() {
                       onClick={() => setIsAuthOpen(true)}
                       className="bg-white/[0.03] border border-white/5 text-white text-[10px] md:text-xs font-black px-6 md:px-8 py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-white/[0.08] hover:border-white/20 transition-all active:scale-95 uppercase tracking-widest"
                     >
-                      Enter Studio
+                      Sign In / Sign Up
                     </button>
                   )}
                 </div>
@@ -265,7 +265,7 @@ export default function Home() {
                     </motion.span>
                   </motion.div>
 
-                  <h1 className="text-7xl md:text-8xl font-black tracking-tighter mb-8 leading-[0.95] perspective-1000">
+                  <h1 className="text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter mb-8 leading-[0.95] perspective-1000">
                     <motion.span
                       initial={{ opacity: 0, filter: 'blur(20px)', y: 20 }}
                       animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
